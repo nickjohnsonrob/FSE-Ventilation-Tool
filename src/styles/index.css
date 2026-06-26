@@ -919,123 +919,137 @@ button {
   font-family: var(--mono);
 }
 
-/* ---- Room sub-table (multizone + roomsEnabled) ---- */
+/* ---- v3 inline rooms (chevron-expand under each zone row) ---- */
 
-.zone-rooms {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.room-table {
-  border: 1px solid var(--line2);
-  border-radius: 8px;
-  background: var(--card);
-  box-shadow: 0 1px 2px rgba(24, 29, 37, 0.06);
-  overflow: hidden;
-}
-
-.room-table__toolbar {
-  display: flex;
-  justify-content: space-between;
+.zone-row__tag-stack {
+  display: inline-flex;
   align-items: center;
-  padding: 10px 12px;
-  background: var(--sunken);
-  border-bottom: 1px solid var(--line2);
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
 }
 
-.room-table__title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.room-table__zone-tag {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
+.zone-row__chev {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--mut);
+  cursor: pointer;
+  font-size: 9px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 3px;
-  background: var(--ac100);
-  color: var(--ac2);
-  border: 1px solid var(--ac200);
+  padding: 0;
+  transition: transform 120ms ease, color 120ms ease;
 }
 
-.room-table__title > span:not(.room-table__zone-tag):not(.room-table__hint) {
-  font-size: 13px;
-  font-weight: 600;
+.zone-row__chev:hover {
+  background: var(--inset);
   color: var(--ink);
 }
 
-.room-table__hint {
+.zone-row__chev[aria-expanded="true"] {
+  transform: rotate(90deg);
+  color: var(--ac2);
+}
+
+.zone-row__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ac);
+  display: inline-block;
+}
+
+.zone-row__room-count {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--mut);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* Room row — shares the zone-table thead, indented, tinted background */
+
+.zone-table__main tr.room-row {
+  background: var(--inset);
+}
+
+.zone-table__main tr.room-row td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.zone-table__main tr.room-row td.col-tag {
+  padding-left: 26px;
+}
+
+.room-row__tag-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-row__arrow {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tag-input--room {
+  width: 76px;
   font-size: 11px;
   color: var(--sec);
-  line-height: 1.35;
 }
 
-.room-table__scroll {
-  overflow-x: auto;
+/* + Room sub-row — single cell spanning the columns, tinted background */
+
+.zone-table__main tr.add-room-row {
+  background: var(--inset);
 }
 
-.room-table table {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
-  min-width: 1040px;
-  font-size: 12.5px;
-}
-
-.room-table th {
-  background: var(--sunken);
-  text-align: left;
-  padding: 9px 10px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--sec);
-  font-weight: 600;
+.zone-table__main tr.add-room-row td.add-room-cell {
+  padding: 9px 12px 9px 26px;
   border-bottom: 1px solid var(--line2);
 }
 
-.room-table th.num {
-  text-align: right;
+.add-room-stack {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-.room-table th.calc {
-  color: var(--mut);
+.add-room-btn {
+  font-family: var(--sans);
+  font-size: 11px;
   font-weight: 500;
+  padding: 4px 10px;
+  border: 1px dashed var(--ac200);
+  border-radius: 5px;
+  background: var(--acq);
+  color: var(--ac2);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.room-table td {
-  padding: 5px 8px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: middle;
+.add-room-btn:hover {
+  background: #ece6ff;
 }
 
-.room-table td.num {
-  text-align: right;
-  font-family: var(--mono);
+.add-room-hint {
+  font-size: 11px;
+  color: var(--mut);
+  line-height: 1.35;
 }
 
-.room-table td.num input {
-  text-align: right;
-  font-family: var(--mono);
-}
-
-.room-table td.num.calc {
-  font-feature-settings: 'tnum' 1;
-  color: var(--sec);
-}
-
-.room-table tr.row--crit td.num.calc {
-  color: var(--altx);
-  font-weight: 600;
-}
+/* CRIT badges — zone row inline + room row */
 
 .crit-badge {
   display: inline-block;
@@ -1051,9 +1065,7 @@ button {
   vertical-align: middle;
 }
 
-.room-table__empty {
-  text-align: center;
-  padding: 18px 12px !important;
-  color: var(--mut);
-  font-size: 12px;
+.crit-badge--inline {
+  font-size: 8px;
+  padding: 1px 4px;
 }

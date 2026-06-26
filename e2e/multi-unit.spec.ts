@@ -1,7 +1,9 @@
 /**
- * E2E tests for the multi-AHU / multi-zone / multi-room UI controls that
- * restore the v1.0.0 behavior. These complement the math-pinning smoke
- * tests in smoke.spec.ts.
+ * E2E tests for the multi-AHU / multi-zone / multi-room UI controls.
+ * v3 — rooms render inline below each zone row (chevron expand), so we
+ * scope to `.zone-row` (not just `tbody tr`) to ignore room rows and
+ * the +Room sub-row. The CRIT badge appears on the room with the
+ * highest Zp, plus an inline CRIT badge on the parent zone row.
  */
 import { test, expect } from '@playwright/test';
 
@@ -32,7 +34,7 @@ test.describe('FSE Ventilation Tool — multi-unit controls', () => {
     await expect(active).toContainText('DOAS-01');
     // Singlezone seed has one zone with tag RM-01
     await expect(
-      page.locator('.zone-table__main tbody tr td input.tag-input').first(),
+      page.locator('.zone-row td.col-tag input.tag-input').first(),
     ).toHaveValue('RM-01');
   });
 
@@ -49,22 +51,22 @@ test.describe('FSE Ventilation Tool — multi-unit controls', () => {
 
   test('Switching active AHU preserves each unit state', async ({ page }) => {
     await page.goto('/');
-    const rows = () => page.locator('.zone-table__main tbody tr');
+    const zoneRows = () => page.locator('.zone-row');
 
     // Edit RTU-01, zone 1 area = 1000
-    await rows().first().locator('input[type="number"]').nth(0).fill('1000');
-    await expect(rows().first().locator('input[type="number"]').nth(0)).toHaveValue('1000');
+    await zoneRows().first().locator('input[type="number"]').nth(0).fill('1000');
+    await expect(zoneRows().first().locator('input[type="number"]').nth(0)).toHaveValue('1000');
 
     // Add a new multizone unit
     await page.getByRole('button', { name: /Add unit/ }).click();
     await page.locator('[data-add-type="multizone"]').click();
 
     // New tab is active; its zones are the seed (area = 0)
-    await expect(rows().first().locator('input[type="number"]').nth(0)).toHaveValue('0');
+    await expect(zoneRows().first().locator('input[type="number"]').nth(0)).toHaveValue('0');
 
     // Switch back to RTU-01 — area is still 1000
     await page.locator('.ahu-tab', { hasText: 'RTU-01' }).click();
-    await expect(rows().first().locator('input[type="number"]').nth(0)).toHaveValue('1000');
+    await expect(zoneRows().first().locator('input[type="number"]').nth(0)).toHaveValue('1000');
   });
 
   test('Cannot remove the last AHU (× button is hidden)', async ({ page }) => {
@@ -89,21 +91,21 @@ test.describe('FSE Ventilation Tool — multi-unit controls', () => {
 test.describe('FSE Ventilation Tool — zone / room controls', () => {
   test('Add zone adds a TU-NN row', async ({ page }) => {
     await page.goto('/');
-    const before = await page.locator('.zone-table__main tbody tr').count();
+    const before = await page.locator('.zone-row').count();
     await page.getByTestId('add-zone').click();
-    const after = await page.locator('.zone-table__main tbody tr').count();
+    const after = await page.locator('.zone-row').count();
     expect(after).toBe(before + 1);
-    // New row's tag input is TU-03
+    // New zone row's tag input is TU-03
     await expect(
-      page.locator('.zone-table__main tbody tr').last().locator('input.tag-input'),
+      page.locator('.zone-row').last().locator('input.tag-input'),
     ).toHaveValue('TU-03');
   });
 
   test('Remove zone drops the matching row', async ({ page }) => {
     await page.goto('/');
-    const before = await page.locator('.zone-table__main tbody tr').count();
+    const before = await page.locator('.zone-row').count();
     await page.locator('[data-remove-zone]').first().click();
-    const after = await page.locator('.zone-table__main tbody tr').count();
+    const after = await page.locator('.zone-row').count();
     expect(after).toBe(before - 1);
   });
 
@@ -112,56 +114,68 @@ test.describe('FSE Ventilation Tool — zone / room controls', () => {
     // Edit a tag, add a zone, then reset
     await page.getByTestId('add-zone').click();
     await page.getByRole('button', { name: /Reset zones/ }).click();
-    await expect(page.locator('.zone-table__main tbody tr')).toHaveCount(2);
+    await expect(page.locator('.zone-row')).toHaveCount(2);
     await expect(
-      page.locator('.zone-table__main tbody tr').first().locator('input.tag-input'),
+      page.locator('.zone-row').first().locator('input.tag-input'),
     ).toHaveValue('TU-1-01');
   });
 
-  test('Rooms toggle reveals a per-zone room sub-table; add/remove a room', async ({ page }) => {
+  test('No global Rooms toggle — rooms are revealed by chevron expand', async ({ page }) => {
     await page.goto('/');
-    // Rooms sub-table is hidden by default
-    await expect(page.locator('.room-table')).toHaveCount(0);
+    // The global Rooms toggle is gone in v3.
+    await expect(page.getByTestId('rooms-toggle')).toHaveCount(0);
 
-    // Toggle on
-    await page.getByTestId('rooms-toggle').click();
-    await expect(page.locator('.room-table')).toHaveCount(2); // one per zone
+    // No room rows visible by default
+    await expect(page.locator('[data-room-row]')).toHaveCount(0);
 
-    // Add a room to the first zone
-    const firstZoneAdd = page.locator('[data-room-add]').first();
-    await firstZoneAdd.click();
+    // Open the first zone via chevron
+    await page.locator('[data-testid^="chev-"]').first().click();
+    // The + Room sub-row appears under the zone
+    await expect(page.getByTestId('add-room').first()).toBeVisible();
+
+    // Add a room
+    await page.getByTestId('add-room').first().click();
     await expect(page.locator('[data-room-row]')).toHaveCount(1);
 
     // Remove the room
     await page.locator('[data-room-remove]').first().click();
     await expect(page.locator('[data-room-row]')).toHaveCount(0);
-    // Empty-state message is shown
-    await expect(page.getByText(/No rooms yet/).first()).toBeVisible();
+
+    // The + Room sub-row is still visible because chevron is open
+    await expect(page.getByTestId('add-room').first()).toBeVisible();
+
+    // Closing the chevron hides the + Room sub-row
+    await page.locator('[data-testid^="chev-"]').first().click();
+    await expect(page.getByTestId('add-room')).toHaveCount(0);
   });
 
-  test('Critical-room badge appears on the row with the highest Zp', async ({ page }) => {
+  test('Critical-room badge appears on the room with the highest Zp; inline CRIT on parent zone row', async ({ page }) => {
     await page.goto('/');
-    await page.getByTestId('rooms-toggle').click();
+    // Open the first zone
+    await page.locator('[data-testid^="chev-"]').first().click();
 
-    // First zone: add 2 rooms, area 500, pop 5 → Voz = 5·5 + 0.06·500 = 55, Vbz = 55, Voz = 55/1 = 55
-    const zoneAdd = page.locator('[data-room-add]').first();
-    await zoneAdd.click();
-    await zoneAdd.click();
+    // Add 2 rooms to the first zone
+    await page.getByTestId('add-room').first().click();
+    await page.getByTestId('add-room').first().click();
 
-    // First room (row 0) — area 500, pop 5 → Voz = 55, vpz 150 → Zp = 55/150 = 0.367
+    // First room (row 0): area 500, pop 5 → Rp·Pz + Ra·Az = 5·5 + 0.06·500 = 55, Voz = 55, vpz 150 → Zp = 55/150 = 0.367
     const r0 = page.locator('[data-room-row]').nth(0);
-    await r0.locator('input[type="number"]').nth(0).fill('500'); // area
-    await r0.locator('input[type="number"]').nth(1).fill('5'); // pop
-    await r0.locator('input[type="number"]').nth(2).fill('150'); // vpz
+    await r0.locator('input[type="number"]').nth(0).fill('500');
+    await r0.locator('input[type="number"]').nth(1).fill('5');
+    await r0.locator('input[type="number"]').nth(2).fill('150');
 
-    // Second room — area 1000, pop 10 → Voz = 5·10 + 0.06·1000 = 110, vpz 150 → Zp = 110/150 = 0.733 (HIGHER → CRIT)
+    // Second room: area 1000, pop 10 → 5·10 + 0.06·1000 = 110, Voz = 110, vpz 150 → Zp = 0.733 (HIGHER → CRIT)
     const r1 = page.locator('[data-room-row]').nth(1);
     await r1.locator('input[type="number"]').nth(0).fill('1000');
     await r1.locator('input[type="number"]').nth(1).fill('10');
     await r1.locator('input[type="number"]').nth(2).fill('150');
 
-    // Second row has the CRIT badge
+    // Second room row has CRIT badge
     await expect(r1.locator('.crit-badge')).toBeVisible();
     await expect(r0.locator('.crit-badge')).toHaveCount(0);
+
+    // Inline CRIT badge appears on the parent zone row (in Voz cell)
+    const firstZoneRow = page.locator('.zone-row').first();
+    await expect(firstZoneRow.locator('.crit-badge--inline')).toBeVisible();
   });
 });

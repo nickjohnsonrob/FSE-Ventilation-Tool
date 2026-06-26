@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   AhuInput,
   MultiZoneResult,
@@ -5,6 +6,7 @@ import type {
   RoomResult,
   SingleZoneResult,
   ZoneInput,
+  ZoneResult,
 } from '../lib/ashrae621';
 import { EZ_CONFIGS, OCCUPANCY_CATEGORIES } from '../lib/tables';
 import { fmtCfm, fmtRatio } from '../lib/format';
@@ -24,12 +26,17 @@ export interface ZoneTableProps {
 }
 
 /**
- * Zone input table + (optional) room sub-table per zone + footer add controls.
+ * Zone input table.
+ *
+ * v3 — rooms render **inline** below each zone row (chevron expand) instead
+ * of in a separate sub-table. This matches the v1.0.0 layout and removes
+ * the global "Rooms" toolbar toggle. Room rows share the same `<thead>` as
+ * their parent zone; an indented `+ Room` sub-row appears at the bottom of
+ * each expanded zone with the v1-style "Rooms drive TU totals" checkbox.
  *
  * Two display modes:
- *   - **multizone** — one row per TU; optional rooms sub-table per zone when
- *     `ahu.roomsEnabled` is true (matches v1.0.0 "roomsEnabled" toggle).
- *   - **singlezone** — one row per zone; no rooms sub-table (the DOAS view).
+ *   - **multizone** — one row per TU; rooms inline when chevron is open.
+ *   - **singlezone** — one row per zone; no rooms.
  */
 export function ZoneTable({
   ahu,
@@ -46,7 +53,16 @@ export function ZoneTable({
 }: ZoneTableProps): JSX.Element {
   const occOptions = Object.keys(OCCUPANCY_CATEGORIES).sort();
   const isMulti = ahu.type === 'multizone';
-  const roomsEnabled = ahu.roomsEnabled ?? false;
+
+  // UI-only state — which zones are expanded. Resets when the AHU changes.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggleExpanded = (zid: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(zid)) next.delete(zid);
+      else next.add(zid);
+      return next;
+    });
 
   // Build a map of zone id -> rooms result for the multizone-with-rooms view.
   const roomResultsByZone = new Map<string, RoomResult[]>();
@@ -91,17 +107,6 @@ export function ZoneTable({
           <span>Ventilation Zones</span>
         </div>
         <div className="zone-table__toolbar-actions">
-          {isMulti && (
-            <button
-              type="button"
-              className={`btn btn--ghost${roomsEnabled ? ' btn--on' : ''}`}
-              onClick={() => onPatchAhu({ roomsEnabled: !roomsEnabled })}
-              data-testid="rooms-toggle"
-              title="When on, each zone has its own rooms table; the critical room drives Voz."
-            >
-              {roomsEnabled ? 'Rooms ●' : 'Rooms'}
-            </button>
-          )}
           <button
             type="button"
             className="btn btn--ghost"
@@ -174,133 +179,37 @@ export function ZoneTable({
           </thead>
           <tbody>
             {ahu.zones.map((z) => {
-              const row =
-                'rows' in result ? result.rows.find((r) => r.z.id === z.id) : null;
+              const row: ZoneResult | null =
+                'rows' in result && result.rows
+                  ? result.rows.find((r) => r.z.id === z.id) ?? null
+                  : null;
               const critRow = 'crit' in result ? result.crit : null;
               const isCrit = !!critRow && critRow.z.id === z.id;
+              const rooms = z.rooms ?? [];
+              const isOpen = expanded.has(z.id);
+              // CRIT badge on zone row: the zone owns the critical room
+              // (highest Zp) per §6.2.5.1. `ZoneResult.critRoomId` is the
+              // authoritative signal from the math core.
+              const hasCriticalRoom = row !== null && row.critRoomId !== null;
               return (
-                <tr key={z.id} className={isCrit ? 'row--crit' : undefined}>
-                  <td className="col-tag">
-                    <input
-                      className="tag-input"
-                      value={z.tag ?? ''}
-                      onChange={(e) =>
-                        onPatchZone(z.id, { tag: e.target.value })
-                      }
-                    />
-                  </td>
-                  <td className="col-space">
-                    <select
-                      value={z.space}
-                      onChange={(e) =>
-                        onPatchZone(z.id, { space: e.target.value })
-                      }
-                    >
-                      {occOptions.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(z.area) ? z.area : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatchZone(z.id, { area: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(z.pop) ? z.pop : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatchZone(z.id, { pop: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(z.vpz) ? z.vpz : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatchZone(z.id, { vpz: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  {isMulti && (
-                    <td className="num">
-                      <input
-                        type="number"
-                        min={0}
-                        value={Number.isFinite(z.vdz ?? 0) ? (z.vdz ?? 0) : 0}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          onPatchZone(z.id, { vdz: isFinite(v) ? v : 0 });
-                        }}
-                      />
-                    </td>
-                  )}
-                  {isMulti && (
-                    <td className="num">
-                      <input
-                        type="number"
-                        min={0}
-                        value={Number.isFinite(z.vdzm ?? 0) ? (z.vdzm ?? 0) : 0}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          onPatchZone(z.id, { vdzm: isFinite(v) ? v : 0 });
-                        }}
-                      />
-                    </td>
-                  )}
-                  <td>
-                    <select
-                      value={z.ezConfig}
-                      onChange={(e) =>
-                        onPatchZone(z.id, { ezConfig: e.target.value })
-                      }
-                    >
-                      {EZ_CONFIGS.map(([label, _v, short]) => (
-                        <option key={label} value={label}>
-                          {short}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  {isMulti && (
-                    <td className="num calc">
-                      {row ? fmtCfm(row.voz) : '—'}
-                    </td>
-                  )}
-                  {isMulti && (
-                    <td className="num calc">
-                      {row ? fmtRatio(row.zd) : '—'}
-                    </td>
-                  )}
-                  <td className="col-remove">
-                    {ahu.zones.length > 1 && (
-                      <button
-                        type="button"
-                        className="row-remove"
-                        onClick={() => onRemoveZone(z.id)}
-                        title="Remove zone"
-                        aria-label={`Remove ${z.tag ?? 'zone'}`}
-                        data-remove-zone={z.id}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <ZoneRows
+                  key={z.id}
+                  zone={z}
+                  row={row}
+                  isCrit={isCrit}
+                  isMulti={isMulti}
+                  isOpen={isOpen}
+                  rooms={rooms}
+                  hasCriticalRoom={hasCriticalRoom}
+                  occOptions={occOptions}
+                  onToggleExpanded={() => toggleExpanded(z.id)}
+                  onPatchZone={onPatchZone}
+                  onRemoveZone={onRemoveZone}
+                  onPatchRoom={onPatchRoom}
+                  onAddRoom={onAddRoom}
+                  onRemoveRoom={onRemoveRoom}
+                  canRemoveZone={ahu.zones.length > 1}
+                />
               );
             })}
           </tbody>
@@ -329,218 +238,335 @@ export function ZoneTable({
           )}
         </table>
       </div>
-
-      {/* Rooms sub-table — only when multizone + roomsEnabled */}
-      {isMulti && roomsEnabled && (
-        <div className="zone-rooms">
-          {ahu.zones.map((z) => (
-            <RoomTable
-              key={z.id}
-              zone={z}
-              roomResults={roomResultsByZone.get(z.id) ?? []}
-              onAdd={() => onAddRoom(z.id)}
-              onRemove={(rid) => onRemoveRoom(z.id, rid)}
-              onPatch={(rid, p) => onPatchRoom(z.id, rid, p)}
-              onShowEzHelp={onShowEzHelp}
-            />
-          ))}
-        </div>
-      )}
     </section>
   );
 }
 
 // ----------------------------------------------------------------------------
-// Room sub-table
+// Per-zone rows (zone row + inline room rows + +Room sub-row).
+// One component because they're tightly coupled and need a shared open state.
 // ----------------------------------------------------------------------------
 
-interface RoomTableProps {
+interface ZoneRowsProps {
   zone: ZoneInput;
-  roomResults: RoomResult[];
-  onAdd: () => void;
-  onRemove: (rid: string) => void;
-  onPatch: (rid: string, partial: Partial<RoomInput>) => void;
-  onShowEzHelp: () => void;
+  row: ZoneResult | null;
+  isCrit: boolean;
+  isMulti: boolean;
+  isOpen: boolean;
+  rooms: RoomInput[];
+  hasCriticalRoom: boolean;
+  occOptions: string[];
+  onToggleExpanded: () => void;
+  onPatchZone: (id: string, partial: Partial<ZoneInput>) => void;
+  onRemoveZone: (id: string) => void;
+  onPatchRoom: (zid: string, rid: string, partial: Partial<RoomInput>) => void;
+  onAddRoom: (zid: string) => void;
+  onRemoveRoom: (zid: string, rid: string) => void;
+  canRemoveZone: boolean;
 }
 
-function RoomTable({
+function ZoneRows({
   zone,
-  roomResults,
-  onAdd,
-  onRemove,
-  onPatch,
-  onShowEzHelp,
-}: RoomTableProps): JSX.Element {
-  const occOptions = Object.keys(OCCUPANCY_CATEGORIES).sort();
-  const rooms = zone.rooms ?? [];
-
+  row,
+  isCrit,
+  isMulti,
+  isOpen,
+  rooms,
+  hasCriticalRoom,
+  occOptions,
+  onToggleExpanded,
+  onPatchZone,
+  onRemoveZone,
+  onPatchRoom,
+  onAddRoom,
+  onRemoveRoom,
+  canRemoveZone,
+}: ZoneRowsProps): JSX.Element {
   return (
-    <div className="room-table" data-room-zone={zone.id}>
-      <div className="room-table__toolbar">
-        <div className="room-table__title">
-          <span className="room-table__zone-tag">{zone.tag ?? 'Zone'}</span>
-          <span>Zone rooms</span>
-          <span className="room-table__hint">
-            Critical room (highest Z<sub>p</sub>) sets the zone outdoor-air demand.
-          </span>
-        </div>
-        <button
-          type="button"
-          className="btn btn--primary btn--small"
-          onClick={onAdd}
-          data-testid="add-room"
-          data-room-add={zone.id}
-        >
-          + Add room
-        </button>
-      </div>
+    <>
+      {/* ZONE ROW */}
+      <tr
+        className={`zone-row${isCrit ? ' row--crit' : ''}`}
+        data-zone-id={zone.id}
+      >
+        <td className="col-tag">
+          <div className="zone-row__tag-stack">
+            <button
+              type="button"
+              className="zone-row__chev"
+              onClick={onToggleExpanded}
+              aria-label={isOpen ? 'Collapse rooms' : 'Expand rooms'}
+              aria-expanded={isOpen}
+              data-testid={`chev-${zone.id}`}
+              title={isOpen ? 'Collapse rooms' : 'Expand rooms'}
+            >
+              ▶
+            </button>
+            <span className="zone-row__dot" />
+            <input
+              className="tag-input"
+              value={zone.tag ?? ''}
+              onChange={(e) => onPatchZone(zone.id, { tag: e.target.value })}
+            />
+            {rooms.length > 0 && (
+              <span
+                className="zone-row__room-count"
+                title={`${rooms.length} room${rooms.length === 1 ? '' : 's'}`}
+              >
+                {rooms.length}r
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="col-space">
+          <select
+            value={zone.space}
+            onChange={(e) => onPatchZone(zone.id, { space: e.target.value })}
+          >
+            {occOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="num">
+          <input
+            type="number"
+            min={0}
+            value={Number.isFinite(zone.area) ? zone.area : 0}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              onPatchZone(zone.id, { area: isFinite(v) ? v : 0 });
+            }}
+          />
+        </td>
+        <td className="num">
+          <input
+            type="number"
+            min={0}
+            value={Number.isFinite(zone.pop) ? zone.pop : 0}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              onPatchZone(zone.id, { pop: isFinite(v) ? v : 0 });
+            }}
+          />
+        </td>
+        <td className="num">
+          <input
+            type="number"
+            min={0}
+            value={Number.isFinite(zone.vpz) ? zone.vpz : 0}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              onPatchZone(zone.id, { vpz: isFinite(v) ? v : 0 });
+            }}
+          />
+        </td>
+        {isMulti && (
+          <td className="num">
+            <input
+              type="number"
+              min={0}
+              value={Number.isFinite(zone.vdz ?? 0) ? (zone.vdz ?? 0) : 0}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onPatchZone(zone.id, { vdz: isFinite(v) ? v : 0 });
+              }}
+            />
+          </td>
+        )}
+        {isMulti && (
+          <td className="num">
+            <input
+              type="number"
+              min={0}
+              value={Number.isFinite(zone.vdzm ?? 0) ? (zone.vdzm ?? 0) : 0}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onPatchZone(zone.id, { vdzm: isFinite(v) ? v : 0 });
+              }}
+            />
+          </td>
+        )}
+        <td>
+          <select
+            value={zone.ezConfig}
+            onChange={(e) => onPatchZone(zone.id, { ezConfig: e.target.value })}
+          >
+            {EZ_CONFIGS.map(([label, _v, short]) => (
+              <option key={label} value={label}>
+                {short}
+              </option>
+            ))}
+          </select>
+        </td>
+        {isMulti && (
+          <td className="num calc">
+            {row ? fmtCfm(row.voz) : '—'}
+            {hasCriticalRoom && (
+              <span
+                className="crit-badge crit-badge--inline"
+                title="This zone owns the critical (highest-Zp) room."
+              >
+                CRIT
+              </span>
+            )}
+          </td>
+        )}
+        {isMulti && (
+          <td className="num calc">
+            {row ? fmtRatio(row.zd) : '—'}
+          </td>
+        )}
+        <td className="col-remove">
+          {canRemoveZone && (
+            <button
+              type="button"
+              className="row-remove"
+              onClick={() => onRemoveZone(zone.id)}
+              title="Remove zone"
+              aria-label={`Remove ${zone.tag ?? 'zone'}`}
+              data-remove-zone={zone.id}
+            >
+              ×
+            </button>
+          )}
+        </td>
+      </tr>
 
-      <div className="room-table__scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Room</th>
-              <th>Occupancy</th>
-              <th className="num">
-                A<sub>z</sub>
-                <div className="th-sub">ft²</div>
-              </th>
-              <th className="num">P<sub>z</sub></th>
-              <th>
-                E<sub>z</sub>
+      {/* INLINE ROOM ROWS — only when chevron open */}
+      {isOpen &&
+        rooms.map((r) => {
+          const result = row?.roomCalcs?.find((rr) => rr.id === r.id);
+          const isRoomCrit =
+            result !== undefined && row?.critRoomId === r.id;
+          return (
+            <tr
+              key={r.id}
+              className={`room-row${isRoomCrit ? ' row--crit' : ''}`}
+              data-room-row={r.id}
+              data-room-zone={zone.id}
+            >
+              <td className="col-tag">
+                <div className="room-row__tag-stack">
+                  <span className="room-row__arrow">↳</span>
+                  <input
+                    className="tag-input tag-input--room"
+                    value={r.tag ?? ''}
+                    onChange={(e) => onPatchRoom(zone.id, r.id, { tag: e.target.value })}
+                  />
+                </div>
+              </td>
+              <td>
+                <select
+                  value={r.space}
+                  onChange={(e) => onPatchRoom(zone.id, r.id, { space: e.target.value })}
+                >
+                  {occOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="num">
+                <input
+                  type="number"
+                  min={0}
+                  value={Number.isFinite(r.area) ? r.area : 0}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onPatchRoom(zone.id, r.id, { area: isFinite(v) ? v : 0 });
+                  }}
+                />
+              </td>
+              <td className="num">
+                <input
+                  type="number"
+                  min={0}
+                  value={Number.isFinite(r.pop) ? r.pop : 0}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onPatchRoom(zone.id, r.id, { pop: isFinite(v) ? v : 0 });
+                  }}
+                />
+              </td>
+              <td className="num">
+                <input
+                  type="number"
+                  min={0}
+                  value={Number.isFinite(r.vpz) ? r.vpz : 0}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onPatchRoom(zone.id, r.id, { vpz: isFinite(v) ? v : 0 });
+                  }}
+                />
+              </td>
+              {/* Vdz / Vdzm columns: empty (room doesn't carry these) */}
+              {isMulti && <td />}
+              {isMulti && <td />}
+              <td>
+                <select
+                  value={r.ezConfig}
+                  onChange={(e) => onPatchRoom(zone.id, r.id, { ezConfig: e.target.value })}
+                >
+                  {EZ_CONFIGS.map(([label, _v, short]) => (
+                    <option key={label} value={label}>
+                      {short}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="num calc">
+                {result ? fmtCfm(result.voz) : '—'}
+                {isRoomCrit && (
+                  <span className="crit-badge" title="Highest Zp drives Voz">
+                    CRIT
+                  </span>
+                )}
+              </td>
+              {isMulti && <td className="num calc">{result ? fmtRatio(result.zp) : '—'}</td>}
+              <td className="col-remove">
                 <button
                   type="button"
-                  className="help-btn"
-                  onClick={onShowEzHelp}
-                  title="What do these mean? (Table 6-2)"
+                  className="row-remove"
+                  onClick={() => onRemoveRoom(zone.id, r.id)}
+                  title="Remove room"
+                  aria-label={`Remove ${r.tag ?? 'room'}`}
+                  data-room-remove={r.id}
                 >
-                  ?
+                  ×
                 </button>
-              </th>
-              <th className="num">
-                V<sub>pz</sub>
-                <div className="th-sub">cfm</div>
-              </th>
-              <th className="num calc">R<sub>p</sub></th>
-              <th className="num calc">R<sub>a</sub></th>
-              <th className="num calc">V<sub>bz</sub></th>
-              <th className="num calc">V<sub>oz</sub></th>
-              <th className="num calc">Z<sub>p</sub></th>
-              <th className="col-remove" aria-label="Remove"></th>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rooms.length === 0 && (
-              <tr>
-                <td colSpan={12} className="room-table__empty">
-                  No rooms yet — click <strong>+ Add room</strong>.
-                </td>
-              </tr>
-            )}
-            {rooms.map((r) => {
-              const result = roomResults.find((rr) => rr.id === r.id);
-              return (
-                <tr
-                  key={r.id}
-                  className={result?.zp === Math.max(...roomResults.map((x) => x.zp)) ? 'row--crit' : undefined}
-                  data-room-row={r.id}
-                >
-                  <td className="col-tag">
-                    <input
-                      className="tag-input"
-                      value={r.tag ?? ''}
-                      onChange={(e) => onPatch(r.id, { tag: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={r.space}
-                      onChange={(e) => onPatch(r.id, { space: e.target.value })}
-                    >
-                      {occOptions.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(r.area) ? r.area : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatch(r.id, { area: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(r.pop) ? r.pop : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatch(r.id, { pop: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={r.ezConfig}
-                      onChange={(e) => onPatch(r.id, { ezConfig: e.target.value })}
-                    >
-                      {EZ_CONFIGS.map(([label, _v, short]) => (
-                        <option key={label} value={label}>
-                          {short}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      min={0}
-                      value={Number.isFinite(r.vpz) ? r.vpz : 0}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        onPatch(r.id, { vpz: isFinite(v) ? v : 0 });
-                      }}
-                    />
-                  </td>
-                  <td className="num calc">{result ? fmtCfm(result.rp * r.pop) : '—'}</td>
-                  <td className="num calc">{result ? fmtCfm(result.ra * r.area) : '—'}</td>
-                  <td className="num calc">{result ? fmtCfm(result.vbz) : '—'}</td>
-                  <td className="num calc">{result ? fmtCfm(result.voz) : '—'}</td>
-                  <td className="num calc">
-                    {result ? fmtRatio(result.zp) : '—'}
-                    {(() => {
-                      if (!result || roomResults.length === 0) return null;
-                      const maxZp = Math.max(...roomResults.map((x) => x.zp));
-                      return result.zp === maxZp ? (
-                        <span className="crit-badge">CRIT</span>
-                      ) : null;
-                    })()}
-                  </td>
-                  <td className="col-remove">
-                    <button
-                      type="button"
-                      className="row-remove"
-                      onClick={() => onRemove(r.id)}
-                      title="Remove room"
-                      aria-label={`Remove ${r.tag ?? 'room'}`}
-                      data-room-remove={r.id}
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          );
+        })}
+
+      {/* + ROOM SUB-ROW — only when chevron open */}
+      {isOpen && (
+        <tr className="add-room-row" data-add-room-for={zone.id}>
+          <td colSpan={isMulti ? 11 : 9} className="add-room-cell">
+            <div className="add-room-stack">
+              <button
+                type="button"
+                className="btn btn--ghost btn--small add-room-btn"
+                onClick={() => onAddRoom(zone.id)}
+                data-testid="add-room"
+                data-room-add={zone.id}
+              >
+                + Room
+              </button>
+              <span className="add-room-hint">
+                {rooms.length === 0
+                  ? 'Add rooms to make this zone critical-room-aware.'
+                  : `${rooms.length} room${rooms.length === 1 ? '' : 's'} — the highest-Zp one drives Voz.`}
+              </span>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
+
