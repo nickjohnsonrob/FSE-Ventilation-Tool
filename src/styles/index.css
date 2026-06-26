@@ -1069,3 +1069,281 @@ button {
   font-size: 8px;
   padding: 1px 4px;
 }
+
+/* ---- Efficiency chart + equation trace ---- */
+
+.eff-chart-card,
+.eq-trace {
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(24, 29, 37, 0.06);
+  margin-top: 14px;
+}
+
+.eff-chart-card__head,
+.eq-trace__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.eff-chart-card__eyebrow,
+.eq-trace__eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ac2);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.eff-chart-card__title,
+.eq-trace__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.eff-chart-card__sub,
+.eq-trace__note {
+  font-size: 12px;
+  color: var(--sec);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.eff-chart-card__sub {
+  max-width: 56ch;
+}
+
+.eq-trace__units {
+  color: var(--mut);
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.eq-trace__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eq-trace__select {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* EffZoneChart bars */
+
+.eff-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 14px;
+}
+
+.eff-chart__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eff-chart__tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--sec);
+  width: 78px;
+  text-align: right;
+  flex: none;
+  font-weight: 500;
+}
+
+.eff-chart__tag--crit {
+  color: var(--altx);
+  font-weight: 700;
+}
+
+.eff-chart__track {
+  flex: 1;
+  height: 18px;
+  background: var(--sunken);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.eff-chart__bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ac200);
+  border-radius: 3px;
+  transform-origin: left center;
+  animation: vrpGrow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 200ms ease;
+}
+
+.eff-chart__bar--low {
+  background: #e6a45a;
+}
+
+.eff-chart__bar--crit {
+  background: var(--altx);
+}
+
+.eff-chart__val {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--sec);
+  width: 50px;
+  flex: none;
+  text-align: right;
+  font-weight: 500;
+  font-feature-settings: 'tnum' 1;
+}
+
+.eff-chart__val--crit {
+  color: var(--altx);
+  font-weight: 700;
+}
+
+.eff-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--faint);
+  margin-top: 9px;
+  padding-left: 88px;
+  padding-right: 60px;
+}
+
+.eff-chart__legend {
+  font-size: 11px;
+  color: var(--mut);
+  margin: 12px 0 0;
+}
+
+.eff-chart__legend b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* EquationTrace steps */
+
+.eq-trace__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 14px;
+}
+
+.eq-trace__step {
+  animation: vrpFade 0.3s ease;
+}
+
+.eq-trace__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.eq-trace__line--sub {
+  margin-top: 3px;
+  padding-left: 50px;
+  gap: 8px;
+}
+
+.eq-trace__sym {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ac2);
+  min-width: 42px;
+}
+
+.eq-trace__sym--warn {
+  color: #b6660f;
+}
+
+.eq-trace__sym--ok {
+  color: #2c7a3f;
+}
+
+.eq-trace__sym--crit {
+  color: var(--altx);
+}
+
+.eq-trace__formula {
+  font-size: 11px;
+  color: var(--mut);
+  line-height: 1.35;
+}
+
+.eq-trace__sub {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--sec);
+  font-feature-settings: 'tnum' 1;
+}
+
+.eq-trace__eq {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--faint);
+}
+
+.eq-trace__out {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  font-feature-settings: 'tnum' 1;
+}
+
+.eq-trace__out--ink {
+  color: var(--ink);
+}
+
+.eq-trace__out--ok {
+  color: #2c7a3f;
+}
+
+.eq-trace__out--warn {
+  color: #b6660f;
+}
+
+@keyframes vrpFade {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes vrpGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Two-column analysis layout (chart | trace) on wide screens */
+@media (min-width: 920px) {
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  .analysis-grid > .eff-chart-card,
+  .analysis-grid > .eq-trace {
+    margin-top: 0;
+  }
+}

@@ -7,6 +7,8 @@ import { EzHelpDialog } from './components/EzHelpDialog';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ExportButton } from './components/ExportButton';
 import { AhuPicker } from './components/AhuPicker';
+import { EffZoneChart } from './components/EffZoneChart';
+import { EquationTrace } from './components/EquationTrace';
 import { useAhuState } from './hooks/useAhuState';
 import { compute } from './lib/ashrae621';
 import { EZ_CONFIGS } from './lib/tables';
@@ -72,6 +74,16 @@ export function App(): JSX.Element {
           open={resultsOpen}
           onToggle={() => setResultsOpen(!resultsOpen)}
         />
+
+        {/* Analysis row: per-zone efficiency chart + equation trace.
+            Single-zone units skip the chart (no per-zone breakdown exists
+            for §6.2.5.1 — Ev is always 1) but still get the trace. */}
+        <div className="analysis-grid">
+          {result && 'rows' in result && 'vou' in result && (
+            <EffZoneChart ahu={ahu.ahu} result={result} />
+          )}
+          <EquationTrace ahu={ahu.ahu} result={result} />
+        </div>
       </main>
 
       <footer className="footer">
