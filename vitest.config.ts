@@ -12,7 +12,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./tests/setup.ts'],
+    // Only run unit tests under src/. E2E (e2e/**) is owned by Playwright.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules', 'dist', 'storybook-static', 'e2e'],
     css: false,
     coverage: {
       provider: 'v8',

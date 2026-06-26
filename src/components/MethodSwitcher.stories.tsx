@@ -1,6 +1,33 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { MethodSwitcher } from './MethodSwitcher';
+import type { CalcMethod } from './MethodSwitcher';
+import type { SimplifiedMethod } from '../lib/tables';
+
+function MethodSwitcherStory(props: {
+  method: CalcMethod;
+  simplifiedMethod: SimplifiedMethod;
+  onChange: (m: CalcMethod) => void;
+  onSimplifiedMethodChange: (sm: SimplifiedMethod) => void;
+}): JSX.Element {
+  const [method, setMethod] = useState<CalcMethod>(props.method);
+  const [simplifiedMethod, setSimplifiedMethod] =
+    useState<SimplifiedMethod>(props.simplifiedMethod);
+  return (
+    <MethodSwitcher
+      method={method}
+      simplifiedMethod={simplifiedMethod}
+      onChange={(m) => {
+        setMethod(m);
+        props.onChange(m);
+      }}
+      onSimplifiedMethodChange={(s) => {
+        setSimplifiedMethod(s);
+        props.onSimplifiedMethodChange(s);
+      }}
+    />
+  );
+}
 
 const meta = {
   title: 'Components/MethodSwitcher',
@@ -8,30 +35,10 @@ const meta = {
   tags: ['autodocs'],
   parameters: { layout: 'padded' },
   args: {
-    method: 'appendixA',
-    simplifiedMethod: 'table6-3',
     onChange: () => {},
     onSimplifiedMethodChange: () => {},
   },
-  render: (args) => {
-    const [method, setMethod] = useState<'appendixA' | 'simplified'>(args.method);
-    const [sm, setSm] = useState<'table6-3' | 'eq6-7-6-8'>(args.simplifiedMethod);
-    return (
-      <MethodSwitcher
-        {...args}
-        method={method}
-        simplifiedMethod={sm}
-        onChange={(m) => {
-          setMethod(m);
-          args.onChange(m);
-        }}
-        onSimplifiedMethodChange={(s) => {
-          setSm(s);
-          args.onSimplifiedMethodChange(s);
-        }}
-      />
-    );
-  },
+  render: (args) => <MethodSwitcherStory {...args} />,
 } satisfies Meta<typeof MethodSwitcher>;
 
 export default meta;
