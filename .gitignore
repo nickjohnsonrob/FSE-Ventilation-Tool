@@ -49,3 +49,4 @@ lerna-debug.log*
 # Source maps (keep in dist/ via Vite config, ignore elsewhere)
 *.map
 !dist/**/*.map
+.restore/

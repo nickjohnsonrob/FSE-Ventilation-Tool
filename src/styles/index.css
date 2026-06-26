@@ -482,3 +482,578 @@ button {
   justify-content: flex-end;
   margin-top: var(--sp-4);
 }
+
+
+/* =====================================================================
+ * AHU PICKER (unit rail) — matches v1.0.0 chip row
+ * ===================================================================== */
+
+.ahu-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.ahu-picker__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 600;
+  flex: none;
+}
+
+.ahu-picker__rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 3px 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ahu-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  flex: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.ahu-tab:hover {
+  border-color: var(--ac200, var(--line2));
+}
+
+.ahu-tab--active {
+  border-color: var(--ac);
+  background: var(--acq);
+  box-shadow: 0 1px 2px rgba(24, 29, 37, 0.08);
+}
+
+.ahu-tab__badge {
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--ac200);
+  color: var(--ac2);
+  background: var(--ac100);
+}
+
+.ahu-tab__badge--singlezone {
+  color: var(--catx);
+  background: var(--cabg);
+  border-color: var(--cabd);
+}
+
+.ahu-tab__name {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sec);
+  white-space: nowrap;
+}
+
+.ahu-tab--active .ahu-tab__name {
+  color: var(--ac2);
+}
+
+.ahu-tab__close {
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 1px;
+  margin-left: 2px;
+}
+
+.ahu-tab__close:hover {
+  color: var(--sec);
+}
+
+.ahu-picker__add {
+  position: relative;
+  flex: none;
+}
+
+.ahu-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 13px;
+  border: 1px dashed var(--line3);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sec);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ahu-add-btn:hover {
+  border-color: var(--ac);
+  color: var(--ac2);
+}
+
+.ahu-add-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 100;
+  width: 262px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  box-shadow: 0 16px 40px rgba(24, 29, 37, 0.22);
+  overflow: hidden;
+}
+
+.ahu-add-menu__opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: none;
+  background: var(--card);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+
+.ahu-add-menu__opt:not(:last-of-type) {
+  border-bottom: 1px solid var(--line);
+}
+
+.ahu-add-menu__opt:hover {
+  background: var(--sunken);
+}
+
+.ahu-add-menu__title {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ac2);
+}
+
+.ahu-add-menu__title--single {
+  color: var(--catx);
+}
+
+.ahu-add-menu__hint {
+  font-size: 9px;
+  color: var(--mut);
+  margin-left: 4px;
+}
+
+.ahu-add-menu__desc {
+  font-size: 11px;
+  color: var(--sec);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.ahu-add-menu__note {
+  padding: 7px 14px;
+  background: var(--sunken);
+  font-size: 10px;
+  color: var(--mut);
+  border-top: 1px solid var(--line);
+}
+
+/* =====================================================================
+ * ZONE TABLE — meta strip, toolbar, remove controls, room sub-table
+ * ===================================================================== */
+
+.zone-table__meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.zone-table__meta-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zone-table__meta-field span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 600;
+}
+
+.zone-table__meta-field input {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  background: var(--card);
+  text-align: right;
+}
+
+.zone-table__meta-tag {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--sec);
+}
+
+.zone-table__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin: 14px 0 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.zone-table__toolbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.zone-table__step {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ac2);
+  font-weight: 600;
+}
+
+.zone-table__toolbar-title span:not(.zone-table__step) {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.zone-table__toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn--ghost {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  background: var(--sunken);
+  color: var(--sec);
+  cursor: pointer;
+}
+
+.btn--ghost:hover {
+  border-color: var(--ac);
+  color: var(--ac2);
+}
+
+.btn--on {
+  border-color: var(--ac) !important;
+  background: var(--acq) !important;
+  color: var(--ac2) !important;
+}
+
+.btn--primary {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--ac);
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn--small {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+.zone-table__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(24, 29, 37, 0.06);
+}
+
+.zone-table__main {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 1100px;
+  font-size: 12.5px;
+}
+
+.zone-table__main th {
+  background: var(--sunken);
+  text-align: left;
+  padding: 9px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sec);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line2);
+}
+
+.zone-table__main th.num {
+  text-align: right;
+}
+
+.zone-table__main th.calc {
+  background: var(--calc-bg, var(--sunken));
+}
+
+.zone-table__main td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.zone-table__main td.num {
+  text-align: right;
+}
+
+.zone-table__main td.num input {
+  text-align: right;
+  font-family: var(--mono);
+}
+
+.zone-table__main td.num.calc {
+  font-family: var(--mono);
+  font-feature-settings: 'tnum' 1;
+  color: var(--sec);
+}
+
+.zone-table__main tr.row--crit {
+  background: var(--albg, rgba(214, 124, 80, 0.08));
+}
+
+.zone-table__main tr.row--crit td.num.calc {
+  color: var(--altx);
+  font-weight: 600;
+}
+
+.col-tag input {
+  width: 96px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.col-remove {
+  width: 32px;
+  text-align: center;
+}
+
+.row-remove {
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px;
+}
+
+.row-remove:hover {
+  color: var(--altx);
+}
+
+.th-sub {
+  font-weight: 400;
+  color: var(--faint);
+  font-size: 9.5px;
+  margin-top: 2px;
+}
+
+.zone-table__main tfoot td {
+  font-weight: 600;
+  background: var(--sunken);
+}
+
+.zone-table__main tfoot td.muted {
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+  font-family: var(--mono);
+}
+
+/* ---- Room sub-table (multizone + roomsEnabled) ---- */
+
+.zone-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.room-table {
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(24, 29, 37, 0.06);
+  overflow: hidden;
+}
+
+.room-table__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--sunken);
+  border-bottom: 1px solid var(--line2);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.room-table__title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.room-table__zone-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--ac100);
+  color: var(--ac2);
+  border: 1px solid var(--ac200);
+}
+
+.room-table__title > span:not(.room-table__zone-tag):not(.room-table__hint) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.room-table__hint {
+  font-size: 11px;
+  color: var(--sec);
+  line-height: 1.35;
+}
+
+.room-table__scroll {
+  overflow-x: auto;
+}
+
+.room-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 1040px;
+  font-size: 12.5px;
+}
+
+.room-table th {
+  background: var(--sunken);
+  text-align: left;
+  padding: 9px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sec);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line2);
+}
+
+.room-table th.num {
+  text-align: right;
+}
+
+.room-table th.calc {
+  color: var(--mut);
+  font-weight: 500;
+}
+
+.room-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.room-table td.num {
+  text-align: right;
+  font-family: var(--mono);
+}
+
+.room-table td.num input {
+  text-align: right;
+  font-family: var(--mono);
+}
+
+.room-table td.num.calc {
+  font-feature-settings: 'tnum' 1;
+  color: var(--sec);
+}
+
+.room-table tr.row--crit td.num.calc {
+  color: var(--altx);
+  font-weight: 600;
+}
+
+.crit-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--altx);
+  color: #fff;
+  vertical-align: middle;
+}
+
+.room-table__empty {
+  text-align: center;
+  padding: 18px 12px !important;
+  color: var(--mut);
+  font-size: 12px;
+}

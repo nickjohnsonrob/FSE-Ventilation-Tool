@@ -1,0 +1,145 @@
+/**
+ * Tests for the multi-AHU / multi-zone / multi-room UI state machine
+ * (useAhuState hook). These verify that the state transitions used by the
+ * UI controls (add/remove unit, add/remove zone, add/remove room, switch
+ * active AHU, reset zones) match the v1.0.0 offline bundle's behavior.
+ *
+ * We exercise the hook indirectly via @testing-library/react's renderHook
+ * to make sure React state updates actually fire (not just a pure function).
+ */
+import { act, renderHook } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { useAhuState } from '../useAhuState';
+
+describe('useAhuState', () => {
+  it('seeds with one multizone AHU named RTU-01 with two empty zones', () => {
+    const { result } = renderHook(() => useAhuState());
+    expect(result.current.ahus).toHaveLength(1);
+    const a = result.current.ahus[0];
+    expect(a.name).toBe('RTU-01');
+    expect(a.type).toBe('multizone');
+    expect(a.method).toBe('appendixA');
+    expect(a.zones).toHaveLength(2);
+    expect(a.zones[0].tag).toBe('TU-1-01');
+    expect(a.zones[1].tag).toBe('TU-1-02');
+    expect(result.current.activeId).toBe(a.id);
+  });
+
+  it('addZone appends a zone with a TU-NN tag', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.addZone());
+    expect(result.current.ahu.zones).toHaveLength(3);
+    expect(result.current.ahu.zones[2].tag).toBe('TU-03');
+  });
+
+  it('removeZone drops the matching zone by id', () => {
+    const { result } = renderHook(() => useAhuState());
+    const id = result.current.ahu.zones[0].id;
+    act(() => result.current.removeZone(id));
+    expect(result.current.ahu.zones).toHaveLength(1);
+    expect(result.current.ahu.zones[0].tag).toBe('TU-1-02');
+  });
+
+  it('patchZone updates only the targeted zone', () => {
+    const { result } = renderHook(() => useAhuState());
+    const id = result.current.ahu.zones[0].id;
+    act(() => result.current.patchZone(id, { area: 1234 }));
+    expect(result.current.ahu.zones[0].area).toBe(1234);
+    expect(result.current.ahu.zones[1].area).toBe(0);
+  });
+
+  it('addUnit(multizone) creates RTU-NN, increments type count, and activates it', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.addUnit('multizone'));
+    expect(result.current.ahus).toHaveLength(2);
+    const added = result.current.ahus[1];
+    expect(added.name).toBe('RTU-02');
+    expect(added.type).toBe('multizone');
+    expect(result.current.activeId).toBe(added.id);
+  });
+
+  it('addUnit(singlezone) creates DOAS-01, separate numbering by type', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.addUnit('singlezone'));
+    const added = result.current.ahus[1];
+    expect(added.name).toBe('DOAS-01');
+    expect(added.type).toBe('singlezone');
+    // Single-zone seed has exactly 1 zone with tag RM-01
+    expect(added.zones).toHaveLength(1);
+    expect(added.zones[0].tag).toBe('RM-01');
+  });
+
+  it('removeUnit refuses to remove the last AHU', () => {
+    const { result } = renderHook(() => useAhuState());
+    const id = result.current.ahus[0].id!;
+    act(() => result.current.removeUnit(id));
+    expect(result.current.ahus).toHaveLength(1);
+  });
+
+  it('removeUnit switches activeId when removing the active AHU', () => {
+    const { result } = renderHook(() => useAhuState());
+    let addedId = '';
+    act(() => {
+      addedId = result.current.addUnit('multizone');
+    });
+    expect(result.current.activeId).toBe(addedId);
+    act(() => result.current.removeUnit(addedId));
+    // Falls back to the original AHU
+    expect(result.current.ahus).toHaveLength(1);
+    expect(result.current.activeId).toBe(result.current.ahus[0].id);
+  });
+
+  it('setActive switches the active AHU and isolates state', () => {
+    const { result } = renderHook(() => useAhuState());
+    let firstId = '';
+    let secondId = '';
+    act(() => {
+      firstId = result.current.ahu.id!;
+      secondId = result.current.addUnit('singlezone');
+    });
+    act(() => result.current.setActive(firstId));
+    expect(result.current.activeId).toBe(firstId);
+    expect(result.current.ahu.type).toBe('multizone');
+
+    // Patching active should NOT bleed into the singlezone AHU
+    act(() => result.current.patchZone(result.current.ahu.zones[0].id, { area: 999 }));
+    expect(result.current.ahu.zones[0].area).toBe(999);
+
+    act(() => result.current.setActive(secondId));
+    const second = result.current.ahus.find((a: { id?: string }) => a.id === secondId)!;
+    // Second AHU's only zone is unedited
+    expect(second.zones[0].area).toBe(800); // singlezone seed default
+  });
+
+  it('resetZones restores the type-appropriate seed', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.addZone());
+    act(() => result.current.removeZone(result.current.ahu.zones[0].id));
+    expect(result.current.ahu.zones).toHaveLength(2);
+    act(() => result.current.resetZones());
+    expect(result.current.ahu.zones[0].tag).toBe('TU-1-01');
+    expect(result.current.ahu.zones[1].tag).toBe('TU-1-02');
+  });
+
+  it('addRoom / removeRoom operate on a specific zone', () => {
+    const { result } = renderHook(() => useAhuState());
+    // Opt in via roomsEnabled and add a room to the first zone.
+    act(() => result.current.patch({ roomsEnabled: true }));
+    const zoneId = result.current.ahu.zones[0].id;
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    expect(result.current.ahu.zones[0].rooms).toHaveLength(2);
+    const r0 = result.current.ahu.zones[0].rooms![0].id;
+    act(() => result.current.removeRoom(zoneId, r0));
+    expect(result.current.ahu.zones[0].rooms).toHaveLength(1);
+    // Second zone untouched
+    expect(result.current.ahu.zones[1].rooms ?? []).toHaveLength(0);
+  });
+
+  it('patch updates top-level AHU fields', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.patch({ name: 'RTU-NORTH', condition: 'Heating' }));
+    expect(result.current.ahu.name).toBe('RTU-NORTH');
+    expect(result.current.ahu.condition).toBe('Heating');
+  });
+});
