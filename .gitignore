@@ -1,30 +1,50 @@
-# OS junk
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
-
-# Editors
-.idea/
-.vscode/
-*.iml
-.project
-.classpath
-.settings/
-
-# Node (for tests/)
+# Dependencies
 node_modules/
-npm-debug.log*
-yarn-error.log
-.pnpm-debug.log*
+.pnpm-store/
 
-# Test artifacts
+# Build outputs
+dist/
+dist-ssr/
+storybook-static/
+*.local
+
+# Coverage
 coverage/
 .nyc_output/
-*.lcov
 
-# Build artifacts (none today, but reserve the space)
-dist/
-build/
-*.min.js.map    # we keep the .min.js files committed for true-offline; ignore source maps
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test artifacts
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Legacy offline bundle (kept at root for v1.0.0 archive; v2+ builds from /dist/)
+vendor/
+fonts/
+lib/
+
+# Source maps (keep in dist/ via Vite config, ignore elsewhere)
+*.map
+!dist/**/*.map
