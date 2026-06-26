@@ -100,6 +100,12 @@ export interface RoomInput {
 
 /** A whole AHU (air handler) state. */
 export interface AhuInput {
+  /** Stable id for multi-AHU lists / React keys. Optional — math core doesn't care. */
+  id?: string;
+  /** Display name e.g. "RTU-01", "DOAS-02" — editable in the UI. Optional. */
+  name?: string;
+  /** Free-text condition e.g. "Cooling — design". */
+  condition?: string;
   type: 'multizone' | 'singlezone';
   /** Multi-zone only: full Appendix A vs Simplified §6.2.5.1. */
   method?: 'appendixA' | 'simplified';
@@ -118,6 +124,8 @@ export interface AhuInput {
   zones: ZoneInput[];
   /** Single-zone only: critical room vs lumped rollup. */
   szMode?: 'critical' | 'lumped';
+  /** Multizone only: show rooms sub-table. */
+  roomsEnabled?: boolean;
 }
 
 /** Per-zone calculation result (multi-zone mode). */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Header } from './components/Header';
 import { MethodSwitcher } from './components/MethodSwitcher';
 import { ZoneTable } from './components/ZoneTable';
@@ -6,7 +6,8 @@ import { ResultsBand } from './components/ResultsBand';
 import { EzHelpDialog } from './components/EzHelpDialog';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ExportButton } from './components/ExportButton';
-import { useAhuState, defaultAhu } from './hooks/useAhuState';
+import { AhuPicker } from './components/AhuPicker';
+import { useAhuState } from './hooks/useAhuState';
 import { compute } from './lib/ashrae621';
 import { EZ_CONFIGS } from './lib/tables';
 
@@ -15,14 +16,15 @@ import { EZ_CONFIGS } from './lib/tables';
  *
  * Holds only UI shell state (theme, dialogs). All AHU/zone data lives in
  * the useAhuState hook and is the source of truth for both display and
- * compute().
+ * compute(). `compute()` is memoized on `ahu` so editing one zone doesn't
+ * recompute the rest of the app.
  */
 export function App(): JSX.Element {
   const [dark, setDark] = useState(false);
   const [ezHelpOpen, setEzHelpOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(true);
-  const ahu = useAhuState(defaultAhu());
-  const result = compute(ahu.ahu);
+  const ahu = useAhuState();
+  const result = useMemo(() => compute(ahu.ahu), [ahu.ahu]);
 
   return (
     <div className={`app ${dark ? 'dark' : 'light'}`} data-theme={dark ? 'dark' : 'light'}>
@@ -35,6 +37,14 @@ export function App(): JSX.Element {
       </Header>
 
       <main className="container">
+        <AhuPicker
+          ahus={ahu.ahus}
+          activeId={ahu.activeId}
+          onSelect={ahu.setActive}
+          onAdd={ahu.addUnit}
+          onRemove={ahu.removeUnit}
+        />
+
         <MethodSwitcher
           method={ahu.ahu.method ?? 'appendixA'}
           simplifiedMethod={ahu.ahu.simplifiedMethod ?? 'table6-3'}
@@ -46,6 +56,13 @@ export function App(): JSX.Element {
           ahu={ahu.ahu}
           result={result}
           onPatchAhu={ahu.patch}
+          onPatchZone={ahu.patchZone}
+          onAddZone={ahu.addZone}
+          onRemoveZone={ahu.removeZone}
+          onResetZones={ahu.resetZones}
+          onPatchRoom={ahu.patchRoom}
+          onAddRoom={ahu.addRoom}
+          onRemoveRoom={ahu.removeRoom}
           onShowEzHelp={() => setEzHelpOpen(true)}
         />
 
