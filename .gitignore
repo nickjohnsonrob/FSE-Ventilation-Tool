@@ -41,9 +41,10 @@ lerna-debug.log*
 .env.*.local
 
 # Legacy offline bundle (kept at root for v1.0.0 archive; v2+ builds from /dist/)
-vendor/
-fonts/
-lib/
+/vendor/
+/fonts/
+/lib/
+# (note: src/lib/ IS tracked — the above only ignores top-level legacy paths)
 
 # Source maps (keep in dist/ via Vite config, ignore elsewhere)
 *.map
