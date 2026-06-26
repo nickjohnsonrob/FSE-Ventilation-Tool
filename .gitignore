@@ -1,0 +1,30 @@
+# OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Editors
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Node (for tests/)
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log*
+
+# Test artifacts
+coverage/
+.nyc_output/
+*.lcov
+
+# Build artifacts (none today, but reserve the space)
+dist/
+build/
+*.min.js.map    # we keep the .min.js files committed for true-offline; ignore source maps
