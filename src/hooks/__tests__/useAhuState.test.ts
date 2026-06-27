@@ -240,6 +240,151 @@ describe('useAhuState', () => {
   });
 });
 
+describe('useAhuState — restoreState (snapshot library)', () => {
+  it('restoreState replaces the entire state tree from a serialized snapshot', () => {
+    const { result } = renderHook(() => useAhuState());
+
+    // Snapshot from a different "world": two AHUs, the second is singlezone
+    // DOAS, with non-default zones. activeId points at the second.
+    const serialized = {
+      schemaVersion: 1 as const,
+      ahus: [
+        {
+          id: 'snap-a1',
+          name: 'Snapshot RTU',
+          type: 'multizone' as const,
+          psAuto: true,
+          ps: 0,
+          vpsAuto: true,
+          vps: 0,
+          zones: [
+            {
+              id: 'snap-z1',
+              tag: 'TU-1-01',
+              space: 'Conference / meeting',
+              area: 750,
+              pop: 12,
+              vpz: 0,
+              vdz: 0,
+              vdzm: 0,
+              ezConfig: 'Ceiling supply of cool air',
+              box: 'single' as const,
+              er: 0,
+            },
+          ],
+        },
+        {
+          id: 'snap-a2',
+          name: 'Snapshot DOAS',
+          type: 'singlezone' as const,
+          psAuto: true,
+          ps: 0,
+          vpsAuto: true,
+          vps: 0,
+          zones: [
+            {
+              id: 'snap-z2',
+              tag: 'RM-01',
+              space: 'Office space',
+              area: 1200,
+              pop: 15,
+              vpz: 0,
+              vdz: 0,
+              vdzm: 0,
+              ezConfig: 'Ceiling supply of cool air',
+              box: 'single' as const,
+              er: 0,
+            },
+          ],
+        },
+      ],
+      activeId: 'snap-a2',
+      unitSystem: 'si' as const,
+    };
+
+    act(() => result.current.restoreState(serialized));
+
+    expect(result.current.ahus).toHaveLength(2);
+    expect(result.current.ahus[0].name).toBe('Snapshot RTU');
+    expect(result.current.ahus[1].name).toBe('Snapshot DOAS');
+    expect(result.current.activeId).toBe('snap-a2');
+    expect(result.current.unitSystem).toBe('si');
+    // Active AHU resolved correctly
+    expect(result.current.ahu.id).toBe('snap-a2');
+    expect(result.current.ahu.type).toBe('singlezone');
+    expect(result.current.ahu.zones[0].area).toBe(1200);
+  });
+
+  it('restoreState rejects payloads with a mismatched schema version', () => {
+    const { result } = renderHook(() => useAhuState());
+    const before = result.current.ahus;
+    const beforeActive = result.current.activeId;
+    const beforeUnit = result.current.unitSystem;
+
+    act(() =>
+      result.current.restoreState({
+        // @ts-expect-error — intentionally wrong schemaVersion for the test
+        schemaVersion: 999,
+        ahus: [
+          {
+            id: 'wrong-v-a1',
+            name: 'Wrong Version AHU',
+            type: 'multizone',
+            psAuto: true,
+            ps: 0,
+            vpsAuto: true,
+            vps: 0,
+            zones: [],
+          },
+        ],
+        activeId: 'wrong-v-a1',
+        unitSystem: 'ip',
+      }),
+    );
+
+    // State tree unchanged after a rejected restore
+    expect(result.current.ahus).toBe(before);
+    expect(result.current.activeId).toBe(beforeActive);
+    expect(result.current.unitSystem).toBe(beforeUnit);
+  });
+
+  it('restoreState rejects malformed payloads (missing ahus)', () => {
+    const { result } = renderHook(() => useAhuState());
+    const before = result.current.ahus;
+    act(() =>
+      // @ts-expect-error — intentional bad shape
+      result.current.restoreState({ schemaVersion: 1, activeId: 'x', unitSystem: 'ip' }),
+    );
+    expect(result.current.ahus).toBe(before);
+  });
+
+  it('restoreState falls back to first AHU if activeId is unknown', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() =>
+      result.current.restoreState({
+        schemaVersion: 1,
+        ahus: [
+          {
+            id: 'only-a1',
+            name: 'Only AHU',
+            type: 'multizone',
+            psAuto: true,
+            ps: 0,
+            vpsAuto: true,
+            vps: 0,
+            zones: [],
+          },
+        ],
+        activeId: 'does-not-exist',
+        unitSystem: 'ip',
+      }),
+    );
+    // Falls back to the only AHU's id
+    expect(result.current.activeId).toBe('only-a1');
+    expect(result.current.ahu.id).toBe('only-a1');
+  });
+});
+
 describe('useAhuState — unitSystem persistence', () => {
   // The unit toggle is a global UI preference (like theme). It must
   // survive a page reload so an engineer who set SI doesn't have to
