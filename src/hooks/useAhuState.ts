@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { AhuInput, RoomInput, ZoneInput } from '../lib/ashrae621';
+import type { Units } from '../lib/units';
 
 /** Module-scope id counters so keys stay unique across remounts / hook instances. */
 let _zoneIdCounter = 1000;
@@ -111,6 +112,15 @@ export interface AhuStateApi {
   activeId: string;
   /** The active AHU (resolves activeId; falls back to first). */
   ahu: AhuInput;
+  /**
+   * Active unit system for display. Lives at the root of the state tree
+   * (NOT per-AHU) — it's a global UI preference, like theme. Math core
+   * always operates in I-P canonical (cfm, ft²); this field only drives
+   * the display/format layer.
+   */
+  unitSystem: Units;
+  /** Update the active unit system. */
+  setUnitSystem: (u: Units) => void;
   /** Replace the active AHU entirely (rare; for deserialization). */
   replace: (next: AhuInput) => void;
   /** Shallow-patch the active AHU. */
@@ -142,6 +152,7 @@ export interface AhuStateApi {
 export function useAhuState(): AhuStateApi {
   const [ahus, setAhus] = useState<AhuInput[]>(() => [makeSeedAhu()]);
   const [activeId, setActiveId] = useState<string>('a1');
+  const [unitSystem, setUnitSystemState] = useState<Units>('ip');
 
   const ahu = ahus.find((a) => a.id === activeId) ?? ahus[0];
 
@@ -352,10 +363,14 @@ export function useAhuState(): AhuStateApi {
     });
   }, []);
 
+  const setUnitSystem = useCallback((u: Units) => setUnitSystemState(u), []);
+
   return {
     ahus,
     activeId,
     ahu,
+    unitSystem,
+    setUnitSystem,
     replace: replaceActive,
     patch: patchActive,
     patchZone,

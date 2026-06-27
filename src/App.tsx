@@ -75,6 +75,7 @@ export function App(): JSX.Element {
         <ZoneTable
           ahu={ahu.ahu}
           result={result}
+          unitSystem={ahu.unitSystem}
           onPatchAhu={ahu.patch}
           onPatchZone={ahu.patchZone}
           onAddZone={ahu.addZone}
@@ -89,6 +90,7 @@ export function App(): JSX.Element {
         <ResultsBand
           ahu={ahu.ahu}
           result={result}
+          unitSystem={ahu.unitSystem}
           open={resultsOpen}
           onToggle={() => setResultsOpen(!resultsOpen)}
         />

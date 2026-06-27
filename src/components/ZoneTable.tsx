@@ -10,12 +10,18 @@ import type {
 } from '../lib/ashrae621';
 import { EZ_CONFIGS, OCCUPANCY_CATEGORIES } from '../lib/tables';
 import { fmtCfm, fmtRatio } from '../lib/format';
+import type { Units } from '../lib/units';
 import { PresetMenu } from './PresetMenu';
 import { applyPreset, type Preset } from '../lib/presets';
 
 export interface ZoneTableProps {
   ahu: AhuInput;
   result: MultiZoneResult | SingleZoneResult;
+  /**
+   * Active unit system for display. Optional — components default to I-P
+   * when undefined so existing call sites / tests don't need to thread it.
+   */
+  unitSystem?: Units;
   onPatchAhu: (partial: Partial<AhuInput>) => void;
   onPatchZone: (id: string, partial: Partial<ZoneInput>) => void;
   onAddZone: () => void;
@@ -43,6 +49,8 @@ export interface ZoneTableProps {
 export function ZoneTable({
   ahu,
   result,
+  // Plumbed for P0.3 — currently unused; render logic lives in that card.
+  unitSystem: _unitSystem = 'ip',
   onPatchAhu,
   onPatchZone,
   onAddZone,
