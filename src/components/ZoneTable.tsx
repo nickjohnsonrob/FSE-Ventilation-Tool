@@ -49,8 +49,7 @@ export interface ZoneTableProps {
 export function ZoneTable({
   ahu,
   result,
-  // Plumbed for P0.3 — currently unused; render logic lives in that card.
-  unitSystem: _unitSystem = 'ip',
+  unitSystem = 'ip',
   onPatchAhu,
   onPatchZone,
   onAddZone,
@@ -77,9 +76,7 @@ export function ZoneTable({
   // Focused zone — the row the engineer most recently interacted with. The
   // preset menu defaults to this zone as the target so a single click loads
   // a preset into the row you were just looking at.
-  const [focusedZoneId, setFocusedZoneId] = useState<string | null>(
-    () => ahu.zones[0]?.id ?? null,
-  );
+  const [focusedZoneId, setFocusedZoneId] = useState<string | null>(() => ahu.zones[0]?.id ?? null);
 
   const handleApplyPreset = (zoneId: string, preset: Preset) => {
     const z = ahu.zones.find((zz) => zz.id === zoneId);
@@ -170,9 +167,11 @@ export function ZoneTable({
               <th className="col-space">Occupancy</th>
               <th className="num">
                 A<sub>z</sub>
-                <div className="th-sub">ft²</div>
+                <div className="th-sub">{unitSystem === 'si' ? 'm²' : 'ft²'}</div>
               </th>
-              <th className="num">P<sub>z</sub></th>
+              <th className="num">
+                P<sub>z</sub>
+              </th>
               <th className="num">
                 V<sub>pz</sub>
                 <div className="th-sub">cfm</div>
@@ -217,7 +216,7 @@ export function ZoneTable({
             {ahu.zones.map((z) => {
               const row: ZoneResult | null =
                 'rows' in result && result.rows
-                  ? result.rows.find((r) => r.z.id === z.id) ?? null
+                  ? (result.rows.find((r) => r.z.id === z.id) ?? null)
                   : null;
               const critRow = 'crit' in result ? result.crit : null;
               const isCrit = !!critRow && critRow.z.id === z.id;
@@ -238,6 +237,7 @@ export function ZoneTable({
                   rooms={rooms}
                   hasCriticalRoom={hasCriticalRoom}
                   occOptions={occOptions}
+                  unitSystem={unitSystem}
                   onToggleExpanded={() => toggleExpanded(z.id)}
                   onPatchZone={onPatchZone}
                   onRemoveZone={onRemoveZone}
@@ -257,18 +257,12 @@ export function ZoneTable({
                 <td className="muted" colSpan={3}>
                   Totals
                 </td>
-                <td className="num">
-                  {'sumPz' in result ? result.sumPz : '—'}
-                </td>
-                <td className="num">
-                  {'sumVpz' in result ? fmtCfm(result.sumVpz) : '—'}
-                </td>
+                <td className="num">{'sumPz' in result ? result.sumPz : '—'}</td>
+                <td className="num">{'sumVpz' in result ? fmtCfm(result.sumVpz) : '—'}</td>
                 {isMulti && <td />}
                 {isMulti && <td />}
                 <td />
-                <td className="num calc">
-                  {'sumVoz' in result ? fmtCfm(result.sumVoz) : '—'}
-                </td>
+                <td className="num calc">{'sumVoz' in result ? fmtCfm(result.sumVoz) : '—'}</td>
                 <td />
                 <td />
               </tr>
@@ -294,6 +288,8 @@ interface ZoneRowsProps {
   rooms: RoomInput[];
   hasCriticalRoom: boolean;
   occOptions: string[];
+  /** Active unit system — drives the area-input suffix indicator. */
+  unitSystem: Units;
   onToggleExpanded: () => void;
   onPatchZone: (id: string, partial: Partial<ZoneInput>) => void;
   onRemoveZone: (id: string) => void;
@@ -314,6 +310,7 @@ function ZoneRows({
   rooms,
   hasCriticalRoom,
   occOptions,
+  unitSystem,
   onToggleExpanded,
   onPatchZone,
   onRemoveZone,
@@ -384,22 +381,33 @@ function ZoneRows({
           </select>
         </td>
         <td className="num">
-          <input
-            type="number"
-            min={0}
-            value={Number.isFinite(zone.area) ? zone.area : 0}
-            disabled={rooms.length > 0}
-            data-testid={rooms.length > 0 ? `zone-area-locked-${zone.id}` : `zone-area-${zone.id}`}
-            title={
-              rooms.length > 0
-                ? 'Locked — Σ(rooms) drives the zone total. Delete all rooms to edit.'
-                : undefined
-            }
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              onPatchZone(zone.id, { area: isFinite(v) ? v : 0 });
-            }}
-          />
+          <div className="num-cell-with-suffix">
+            <input
+              type="number"
+              min={0}
+              value={Number.isFinite(zone.area) ? zone.area : 0}
+              disabled={rooms.length > 0}
+              data-testid={
+                rooms.length > 0 ? `zone-area-locked-${zone.id}` : `zone-area-${zone.id}`
+              }
+              title={
+                rooms.length > 0
+                  ? 'Locked — Σ(rooms) drives the zone total. Delete all rooms to edit.'
+                  : undefined
+              }
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onPatchZone(zone.id, { area: isFinite(v) ? v : 0 });
+              }}
+            />
+            <span
+              className="num-suffix"
+              aria-hidden="true"
+              data-testid={`area-unit-suffix-${zone.id}`}
+            >
+              {unitSystem === 'si' ? 'm²' : 'ft²'}
+            </span>
+          </div>
         </td>
         <td className="num">
           <input
@@ -481,11 +489,7 @@ function ZoneRows({
             )}
           </td>
         )}
-        {isMulti && (
-          <td className="num calc">
-            {row ? fmtRatio(row.zd) : '—'}
-          </td>
-        )}
+        {isMulti && <td className="num calc">{row ? fmtRatio(row.zd) : '—'}</td>}
         <td className="col-remove">
           {canRemoveZone && (
             <button
@@ -506,8 +510,7 @@ function ZoneRows({
       {isOpen &&
         rooms.map((r) => {
           const result = row?.roomCalcs?.find((rr) => rr.id === r.id);
-          const isRoomCrit =
-            result !== undefined && row?.critRoomId === r.id;
+          const isRoomCrit = result !== undefined && row?.critRoomId === r.id;
           return (
             <tr
               key={r.id}
@@ -636,4 +639,3 @@ function ZoneRows({
     </>
   );
 }
-

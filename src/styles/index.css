@@ -483,7 +483,6 @@ button {
   margin-top: var(--sp-4);
 }
 
-
 /* =====================================================================
  * AHU PICKER (unit rail) — matches v1.0.0 chip row
  * ===================================================================== */
@@ -1584,4 +1583,22 @@ button {
   font-family: var(--mono);
   font-size: 10px;
   color: var(--mut);
+}
+
+/* Number cell with trailing unit suffix (e.g. "1000 ft²" inline).
+   Used by the zone-table Az column so the engineer can see which unit
+   system the active value represents without having to glance at the
+   column header. */
+.num-cell-with-suffix {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.num-cell-with-suffix input { width: 72px; }
+.num-suffix {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+  user-select: none;
 }

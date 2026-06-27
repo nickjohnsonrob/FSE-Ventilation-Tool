@@ -2,6 +2,35 @@ import { useCallback, useState } from 'react';
 import type { AhuInput, RoomInput, ZoneInput } from '../lib/ashrae621';
 import type { Units } from '../lib/units';
 
+/** localStorage key for the unit-system preference. Versioned (`v1`)
+ *  so future schema changes can migrate without colliding with stale
+ *  values from older deploys. */
+const UNITS_STORAGE_KEY = 'fse.vent.units.v1';
+
+/** Read the unit-system preference from localStorage. Tolerates blocked
+ *  storage (private mode, file://) by falling back to the default. */
+function readUnitsFromStorage(): Units {
+  if (typeof window === 'undefined') return 'ip';
+  try {
+    const v = window.localStorage.getItem(UNITS_STORAGE_KEY);
+    return v === 'si' || v === 'ip' ? v : 'ip';
+  } catch {
+    return 'ip';
+  }
+}
+
+/** Write the unit-system preference to localStorage. Best-effort — private
+ *  mode / quota errors are swallowed silently so the in-memory toggle still
+ *  works for the session. */
+function writeUnitsToStorage(u: Units): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(UNITS_STORAGE_KEY, u);
+  } catch {
+    // localStorage may be blocked (private mode, file://); ignore.
+  }
+}
+
 /** Module-scope id counters so keys stay unique across remounts / hook instances. */
 let _zoneIdCounter = 1000;
 let _roomIdCounter = 1000;
@@ -152,24 +181,20 @@ export interface AhuStateApi {
 export function useAhuState(): AhuStateApi {
   const [ahus, setAhus] = useState<AhuInput[]>(() => [makeSeedAhu()]);
   const [activeId, setActiveId] = useState<string>('a1');
-  const [unitSystem, setUnitSystemState] = useState<Units>('ip');
+  const [unitSystem, setUnitSystemState] = useState<Units>(() => readUnitsFromStorage());
 
   const ahu = ahus.find((a) => a.id === activeId) ?? ahus[0];
 
   const replaceActive = useCallback(
     (next: AhuInput) => {
-      setAhus((prev) =>
-        prev.map((a) => (a.id === activeId ? { ...next, id: activeId } : a)),
-      );
+      setAhus((prev) => prev.map((a) => (a.id === activeId ? { ...next, id: activeId } : a)));
     },
     [activeId],
   );
 
   const patchActive = useCallback(
     (partial: Partial<AhuInput>) => {
-      setAhus((prev) =>
-        prev.map((a) => (a.id === activeId ? { ...a, ...partial } : a)),
-      );
+      setAhus((prev) => prev.map((a) => (a.id === activeId ? { ...a, ...partial } : a)));
     },
     [activeId],
   );
@@ -221,9 +246,7 @@ export function useAhuState(): AhuStateApi {
     (id: string) => {
       setAhus((prev) =>
         prev.map((a) =>
-          a.id !== activeId
-            ? a
-            : { ...a, zones: a.zones.filter((z) => z.id !== id) },
+          a.id !== activeId ? a : { ...a, zones: a.zones.filter((z) => z.id !== id) },
         ),
       );
     },
@@ -232,9 +255,7 @@ export function useAhuState(): AhuStateApi {
 
   const resetZones = useCallback(() => {
     setAhus((prev) =>
-      prev.map((a) =>
-        a.id !== activeId ? a : { ...a, zones: defaultZoneFor(a.type) },
-      ),
+      prev.map((a) => (a.id !== activeId ? a : { ...a, zones: defaultZoneFor(a.type) })),
     );
   }, [activeId]);
 
@@ -250,9 +271,7 @@ export function useAhuState(): AhuStateApi {
               const rooms = z.rooms ?? [];
               return {
                 ...z,
-                rooms: rooms.map((r) =>
-                  r.id === rid ? { ...r, ...partial } : r,
-                ),
+                rooms: rooms.map((r) => (r.id === rid ? { ...r, ...partial } : r)),
               };
             }),
           };
@@ -363,7 +382,10 @@ export function useAhuState(): AhuStateApi {
     });
   }, []);
 
-  const setUnitSystem = useCallback((u: Units) => setUnitSystemState(u), []);
+  const setUnitSystem = useCallback((u: Units) => {
+    setUnitSystemState(u);
+    writeUnitsToStorage(u);
+  }, []);
 
   return {
     ahus,

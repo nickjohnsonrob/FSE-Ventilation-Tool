@@ -119,8 +119,14 @@ export function convertVolume(value: number, from: Units, to: Units): number {
 /**
  * Format a flow value (stored in cfm internally) for display in the given
  * unit system. I-P prints cfm directly; SI converts to m³/s.
+ *
+ * Returns a placeholder (`— cfm` / `— m³/s`) for NaN / Infinity so the UI
+ * never renders the literal string "NaN cfm".
  */
 export function formatFlow(value: number, units: Units): string {
+  if (!Number.isFinite(value)) {
+    return units === 'ip' ? '— cfm' : '— m³/s';
+  }
   if (units === 'ip') return `${value.toFixed(0)} cfm`;
   return `${cfmToM3s(value).toFixed(3)} m³/s`;
 }
@@ -128,8 +134,13 @@ export function formatFlow(value: number, units: Units): string {
 /**
  * Format an area value (stored in ft² internally) for display in the given
  * unit system. I-P prints ft² directly; SI converts to m².
+ *
+ * Returns a placeholder (`— ft²` / `— m²`) for NaN / Infinity.
  */
 export function formatArea(value: number, units: Units): string {
+  if (!Number.isFinite(value)) {
+    return units === 'ip' ? '— ft²' : '— m²';
+  }
   if (units === 'ip') return `${value.toFixed(0)} ft²`;
   return `${ft2ToM2(value).toFixed(1)} m²`;
 }

@@ -161,6 +161,48 @@ describe('units — convenience functions', () => {
   });
 });
 
+describe('units — display helpers handle edge cases', () => {
+  // These guard against the kind of bug that surfaces only in production:
+  // a zone is removed, an input is cleared, an engineer types a stray
+  // character. Math always returns a number; the display layer must
+  // never produce "NaN cfm" or "-0.000 m³/s" in the UI.
+
+  describe('formatFlow', () => {
+    it('handles zero without producing NaN', () => {
+      expect(formatFlow(0, 'ip')).toBe('0 cfm');
+      expect(formatFlow(0, 'si')).toBe('0.000 m³/s');
+    });
+
+    it('handles negative values without crashing (should never happen, but tolerate)', () => {
+      // Negative flows are physically meaningless — they imply the AHU is
+      // blowing air into the return duct. The math core can't produce
+      // them, but a buggy caller could. The display layer should render
+      // a sensible string rather than throw.
+      expect(formatFlow(-100, 'ip')).toBe('-100 cfm');
+      expect(formatFlow(-100, 'si')).toMatch(/^-0\.047 m³\/s$/);
+    });
+
+    it('handles NaN and Infinity gracefully', () => {
+      // The header line must never say "NaN cfm". format() should return
+      // a placeholder so the engineer notices.
+      expect(formatFlow(NaN, 'ip')).toBe('— cfm');
+      expect(formatFlow(Infinity, 'si')).toBe('— m³/s');
+    });
+  });
+
+  describe('formatArea', () => {
+    it('handles very large values without precision loss in the integer part', () => {
+      // A campus-scale AHU might serve 10 million ft². toFixed(0) must
+      // not collapse to scientific notation.
+      expect(formatArea(1e7, 'ip')).toBe('10000000 ft²');
+    });
+
+    it('handles NaN gracefully', () => {
+      expect(formatArea(NaN, 'si')).toBe('— m²');
+    });
+  });
+});
+
 describe('units — canonical NIST reference values', () => {
   // These are the values engineers will recognize from spec books. Pinning
   // them catches any silent drift in the canonical factors.

@@ -8,7 +8,7 @@
  * to make sure React state updates actually fire (not just a pure function).
  */
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAhuState } from '../useAhuState';
 
 describe('useAhuState', () => {
@@ -171,5 +171,62 @@ describe('useAhuState', () => {
     act(() => result.current.renameAhu(result.current.ahus[0].id!, 'RTU-WEST'));
     expect(result.current.activeId).toBe(activeBefore);
     expect(result.current.ahu.name).toBe('RTU-WEST');
+  });
+});
+
+describe('useAhuState — unitSystem persistence', () => {
+  // The unit toggle is a global UI preference (like theme). It must
+  // survive a page reload so an engineer who set SI doesn't have to
+  // flip it back every time. Backed by localStorage with a versioned
+  // key (`fse.vent.units.v1`).
+
+  const KEY = 'fse.vent.units.v1';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('defaults unitSystem to "ip" when localStorage is empty', () => {
+    const { result } = renderHook(() => useAhuState());
+    expect(result.current.unitSystem).toBe('ip');
+  });
+
+  it('reads unitSystem from localStorage on mount', () => {
+    window.localStorage.setItem(KEY, 'si');
+    const { result } = renderHook(() => useAhuState());
+    expect(result.current.unitSystem).toBe('si');
+  });
+
+  it('falls back to "ip" when localStorage has an unknown value', () => {
+    // Tolerate stale / corrupted entries (e.g. someone wrote 'metric'
+    // by hand, or a previous version used a different scheme).
+    window.localStorage.setItem(KEY, 'metric');
+    const { result } = renderHook(() => useAhuState());
+    expect(result.current.unitSystem).toBe('ip');
+  });
+
+  it('setUnitSystem persists to localStorage', () => {
+    const { result } = renderHook(() => useAhuState());
+    act(() => result.current.setUnitSystem('si'));
+    expect(result.current.unitSystem).toBe('si');
+    expect(window.localStorage.getItem(KEY)).toBe('si');
+    act(() => result.current.setUnitSystem('ip'));
+    expect(window.localStorage.getItem(KEY)).toBe('ip');
+  });
+
+  it('tolerates blocked localStorage on write (e.g. private mode)', () => {
+    const { result } = renderHook(() => useAhuState());
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    setItemSpy.mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    // Should NOT throw — the toggle still flips in-memory state.
+    expect(() => act(() => result.current.setUnitSystem('si'))).not.toThrow();
+    expect(result.current.unitSystem).toBe('si');
+    setItemSpy.mockRestore();
   });
 });
