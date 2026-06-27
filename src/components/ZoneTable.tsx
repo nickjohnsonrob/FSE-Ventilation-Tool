@@ -1,4 +1,21 @@
 import { useState } from 'react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type {
   AhuInput,
   MultiZoneResult,
@@ -30,6 +47,7 @@ export interface ZoneTableProps {
   onPatchRoom: (zid: string, rid: string, partial: Partial<RoomInput>) => void;
   onAddRoom: (zid: string) => void;
   onRemoveRoom: (zid: string, rid: string) => void;
+  onReorderZones: (newOrder: string[]) => void;
   onShowEzHelp: () => void;
 }
 
@@ -59,6 +77,7 @@ export function ZoneTable({
   onPatchRoom,
   onAddRoom,
   onRemoveRoom,
+  onReorderZones,
   onShowEzHelp,
 }: ZoneTableProps): JSX.Element {
   const occOptions = Object.keys(OCCUPANCY_CATEGORIES).sort();
@@ -102,6 +121,29 @@ export function ZoneTable({
       if (row.roomCalcs) roomResultsByZone.set(row.z.id, row.roomCalcs);
     }
   }
+
+  // ------------------------------------------------------------------
+  // Drag-to-reorder plumbing (P1 UX). Wraps the zone rows in a
+  // SortableContext and dispatches the new id order up to the parent
+  // state machine on drop. Sensors cover mouse/touch (PointerSensor)
+  // and keyboard (KeyboardSensor) — the latter handles Tab + Space
+  // for accessibility per WAI-ARIA Practices.
+  // ------------------------------------------------------------------
+  const zoneIds = ahu.zones.map((z) => z.id);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent): void => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = zoneIds.indexOf(String(active.id));
+    const newIndex = zoneIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(zoneIds, oldIndex, newIndex);
+    onReorderZones(reordered);
+  };
 
   return (
     <section className="zone-table" aria-label="Zone inputs">
@@ -163,118 +205,127 @@ export function ZoneTable({
       </div>
 
       <div className="zone-table__scroll">
-        <table className="zone-table__main">
-          <thead>
-            <tr>
-              <th className="col-tag">Tag</th>
-              <th className="col-space">Occupancy</th>
-              <th className="num">
-                A<sub>z</sub>
-                <div className="th-sub">ft²</div>
-              </th>
-              <th className="num">P<sub>z</sub></th>
-              <th className="num">
-                V<sub>pz</sub>
-                <div className="th-sub">cfm</div>
-              </th>
-              {isMulti && (
-                <>
-                  <th className="num">
-                    V<sub>dz</sub>
-                    <div className="th-sub">cfm</div>
-                  </th>
-                  <th className="num">
-                    V<sub>dzm</sub>
-                    <div className="th-sub">cfm</div>
-                  </th>
-                </>
-              )}
-              <th>
-                E<sub>z</sub>
-                <button
-                  type="button"
-                  className="help-btn"
-                  onClick={onShowEzHelp}
-                  title="What do these mean? (Table 6-2)"
-                >
-                  ?
-                </button>
-              </th>
-              {isMulti && (
-                <th className="num calc">
-                  V<sub>oz</sub>
-                </th>
-              )}
-              {isMulti && (
-                <th className="num calc">
-                  Z<sub>d</sub>
-                </th>
-              )}
-              <th className="col-remove" aria-label="Remove"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {ahu.zones.map((z) => {
-              const row: ZoneResult | null =
-                'rows' in result && result.rows
-                  ? result.rows.find((r) => r.z.id === z.id) ?? null
-                  : null;
-              const critRow = 'crit' in result ? result.crit : null;
-              const isCrit = !!critRow && critRow.z.id === z.id;
-              const rooms = z.rooms ?? [];
-              const isOpen = expanded.has(z.id);
-              // CRIT badge on zone row: the zone owns the critical room
-              // (highest Zp) per §6.2.5.1. `ZoneResult.critRoomId` is the
-              // authoritative signal from the math core.
-              const hasCriticalRoom = row !== null && row.critRoomId !== null;
-              return (
-                <ZoneRows
-                  key={z.id}
-                  zone={z}
-                  row={row}
-                  isCrit={isCrit}
-                  isMulti={isMulti}
-                  isOpen={isOpen}
-                  rooms={rooms}
-                  hasCriticalRoom={hasCriticalRoom}
-                  occOptions={occOptions}
-                  onToggleExpanded={() => toggleExpanded(z.id)}
-                  onPatchZone={onPatchZone}
-                  onRemoveZone={onRemoveZone}
-                  onPatchRoom={onPatchRoom}
-                  onAddRoom={onAddRoom}
-                  onRemoveRoom={onRemoveRoom}
-                  canRemoveZone={ahu.zones.length > 1}
-                  onFocusZone={setFocusedZoneId}
-                  isFocused={focusedZoneId === z.id}
-                />
-              );
-            })}
-          </tbody>
-          {isMulti && (
-            <tfoot>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <table className="zone-table__main">
+            <thead>
               <tr>
-                <td className="muted" colSpan={3}>
-                  Totals
-                </td>
-                <td className="num">
-                  {'sumPz' in result ? result.sumPz : '—'}
-                </td>
-                <td className="num">
-                  {'sumVpz' in result ? fmtCfm(result.sumVpz) : '—'}
-                </td>
-                {isMulti && <td />}
-                {isMulti && <td />}
-                <td />
-                <td className="num calc">
-                  {'sumVoz' in result ? fmtCfm(result.sumVoz) : '—'}
-                </td>
-                <td />
-                <td />
+                <th className="col-drag" aria-label="Drag" />
+                <th className="col-tag">Tag</th>
+                <th className="col-space">Occupancy</th>
+                <th className="num">
+                  A<sub>z</sub>
+                  <div className="th-sub">ft²</div>
+                </th>
+                <th className="num">P<sub>z</sub></th>
+                <th className="num">
+                  V<sub>pz</sub>
+                  <div className="th-sub">cfm</div>
+                </th>
+                {isMulti && (
+                  <>
+                    <th className="num">
+                      V<sub>dz</sub>
+                      <div className="th-sub">cfm</div>
+                    </th>
+                    <th className="num">
+                      V<sub>dzm</sub>
+                      <div className="th-sub">cfm</div>
+                    </th>
+                  </>
+                )}
+                <th>
+                  E<sub>z</sub>
+                  <button
+                    type="button"
+                    className="help-btn"
+                    onClick={onShowEzHelp}
+                    title="What do these mean? (Table 6-2)"
+                  >
+                    ?
+                  </button>
+                </th>
+                {isMulti && (
+                  <th className="num calc">
+                    V<sub>oz</sub>
+                  </th>
+                )}
+                {isMulti && (
+                  <th className="num calc">
+                    Z<sub>d</sub>
+                  </th>
+                )}
+                <th className="col-remove" aria-label="Remove"></th>
               </tr>
-            </tfoot>
-          )}
-        </table>
+            </thead>
+            <SortableContext items={zoneIds} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {ahu.zones.map((z) => {
+                  const row: ZoneResult | null =
+                    'rows' in result && result.rows
+                      ? result.rows.find((r) => r.z.id === z.id) ?? null
+                      : null;
+                  const critRow = 'crit' in result ? result.crit : null;
+                  const isCrit = !!critRow && critRow.z.id === z.id;
+                  const rooms = z.rooms ?? [];
+                  const isOpen = expanded.has(z.id);
+                  // CRIT badge on zone row: the zone owns the critical room
+                  // (highest Zp) per §6.2.5.1. `ZoneResult.critRoomId` is the
+                  // authoritative signal from the math core.
+                  const hasCriticalRoom = row !== null && row.critRoomId !== null;
+                  return (
+                    <ZoneRows
+                      key={z.id}
+                      zone={z}
+                      row={row}
+                      isCrit={isCrit}
+                      isMulti={isMulti}
+                      isOpen={isOpen}
+                      rooms={rooms}
+                      hasCriticalRoom={hasCriticalRoom}
+                      occOptions={occOptions}
+                      onToggleExpanded={() => toggleExpanded(z.id)}
+                      onPatchZone={onPatchZone}
+                      onRemoveZone={onRemoveZone}
+                      onPatchRoom={onPatchRoom}
+                      onAddRoom={onAddRoom}
+                      onRemoveRoom={onRemoveRoom}
+                      canRemoveZone={ahu.zones.length > 1}
+                      onFocusZone={setFocusedZoneId}
+                      isFocused={focusedZoneId === z.id}
+                    />
+                  );
+                })}
+              </tbody>
+            </SortableContext>
+            {isMulti && (
+              <tfoot>
+                <tr>
+                  <td className="muted" colSpan={4}>
+                    Totals
+                  </td>
+                  <td className="num">
+                    {'sumPz' in result ? result.sumPz : '—'}
+                  </td>
+                  <td className="num">
+                    {'sumVpz' in result ? fmtCfm(result.sumVpz) : '—'}
+                  </td>
+                  {isMulti && <td />}
+                  {isMulti && <td />}
+                  <td />
+                  <td className="num calc">
+                    {'sumVoz' in result ? fmtCfm(result.sumVoz) : '—'}
+                  </td>
+                  <td />
+                  <td />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </DndContext>
       </div>
     </section>
   );
@@ -325,14 +376,45 @@ function ZoneRows({
   isFocused,
 }: ZoneRowsProps): JSX.Element {
   const handleFocus = () => onFocusZone?.(zone.id);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: zone.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // Hide the source row's contents visually during drag — the visual
+    // placeholder is conveyed via the row transform + a faded look, so
+    // the engineer can see where it'll land. Keeps reflow cheap.
+    opacity: isDragging ? 0.4 : undefined,
+  };
   return (
     <>
       {/* ZONE ROW */}
       <tr
-        className={`zone-row${isCrit ? ' row--crit' : ''}${isFocused ? ' row--focused' : ''}`}
+        ref={setNodeRef}
+        style={style}
+        className={`zone-row${isCrit ? ' row--crit' : ''}${isFocused ? ' row--focused' : ''}${isDragging ? ' row--dragging' : ''}`}
         data-zone-id={zone.id}
         onClick={handleFocus}
       >
+        <td className="col-drag">
+          <button
+            type="button"
+            className="zone-row__drag"
+            aria-label={`Reorder zone ${zone.tag ?? zone.id}`}
+            title="Drag to reorder (or focus and press Space, then arrow keys)"
+            data-testid={`drag-${zone.id}`}
+            {...attributes}
+            {...listeners}
+          >
+            <span aria-hidden="true">⋮⋮</span>
+          </button>
+        </td>
         <td className="col-tag">
           <div className="zone-row__tag-stack">
             <button
