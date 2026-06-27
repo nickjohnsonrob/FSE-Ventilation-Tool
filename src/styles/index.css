@@ -1347,3 +1347,27 @@ button {
     margin-top: 0;
   }
 }
+
+/* ---- Locked zone inputs (Σ rooms drives the zone) ---- */
+
+.zone-table__main input[type="number"]:disabled {
+  background: var(--sunken);
+  color: var(--mut);
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.zone-row__rollup-hint {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ac2);
+  background: var(--acq);
+  border: 1px solid var(--ac100);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Header } from './components/Header';
 import { MethodSwitcher } from './components/MethodSwitcher';
 import { ZoneTable } from './components/ZoneTable';
@@ -22,14 +22,31 @@ import { EZ_CONFIGS } from './lib/tables';
  * recompute the rest of the app.
  */
 export function App(): JSX.Element {
-  const [dark, setDark] = useState(false);
+  // Theme persisted in localStorage; default to light.
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('fse:theme') === 'dark';
+  });
   const [ezHelpOpen, setEzHelpOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(true);
   const ahu = useAhuState();
   const result = useMemo(() => compute(ahu.ahu), [ahu.ahu]);
 
+  // The DS bundle's dark theme is bound to `:root[data-theme="dark"]`,
+  // which targets the <html> element. Sync the attribute whenever
+  // `dark` changes so toggling actually flips the palette.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    try {
+      window.localStorage.setItem('fse:theme', dark ? 'dark' : 'light');
+    } catch {
+      // localStorage may be blocked (private mode, file://); ignore.
+    }
+  }, [dark]);
+
   return (
-    <div className={`app ${dark ? 'dark' : 'light'}`} data-theme={dark ? 'dark' : 'light'}>
+    <div className={`app ${dark ? 'dark' : 'light'}`}>
       <Header
         title="FSE Ventilation Calculation"
         subtitle="ANSI/ASHRAE 62.1-2022 Ventilation Rate Procedure"
