@@ -10,6 +10,8 @@ import type {
 } from '../lib/ashrae621';
 import { EZ_CONFIGS, OCCUPANCY_CATEGORIES } from '../lib/tables';
 import { fmtCfm, fmtRatio } from '../lib/format';
+import { PresetMenu } from './PresetMenu';
+import { applyPreset, type Preset } from '../lib/presets';
 
 export interface ZoneTableProps {
   ahu: AhuInput;
@@ -64,6 +66,27 @@ export function ZoneTable({
       return next;
     });
 
+  // Focused zone — the row the engineer most recently interacted with. The
+  // preset menu defaults to this zone as the target so a single click loads
+  // a preset into the row you were just looking at.
+  const [focusedZoneId, setFocusedZoneId] = useState<string | null>(
+    () => ahu.zones[0]?.id ?? null,
+  );
+
+  const handleApplyPreset = (zoneId: string, preset: Preset) => {
+    const z = ahu.zones.find((zz) => zz.id === zoneId);
+    if (!z) return;
+    const next = applyPreset(z, preset);
+    onPatchZone(zoneId, {
+      space: next.space,
+      area: next.area,
+      pop: next.pop,
+      ezConfig: next.ezConfig,
+      rooms: next.rooms,
+    });
+    setFocusedZoneId(zoneId);
+  };
+
   // Build a map of zone id -> rooms result for the multizone-with-rooms view.
   const roomResultsByZone = new Map<string, RoomResult[]>();
   if (isMulti && 'rows' in result) {
@@ -107,6 +130,11 @@ export function ZoneTable({
           <span>Ventilation Zones</span>
         </div>
         <div className="zone-table__toolbar-actions">
+          <PresetMenu
+            zones={ahu.zones}
+            focusedZoneId={focusedZoneId ?? undefined}
+            onApply={handleApplyPreset}
+          />
           <button
             type="button"
             className="btn btn--ghost"
@@ -209,6 +237,8 @@ export function ZoneTable({
                   onAddRoom={onAddRoom}
                   onRemoveRoom={onRemoveRoom}
                   canRemoveZone={ahu.zones.length > 1}
+                  onFocusZone={setFocusedZoneId}
+                  isFocused={focusedZoneId === z.id}
                 />
               );
             })}
@@ -263,6 +293,8 @@ interface ZoneRowsProps {
   onAddRoom: (zid: string) => void;
   onRemoveRoom: (zid: string, rid: string) => void;
   canRemoveZone: boolean;
+  onFocusZone?: (id: string) => void;
+  isFocused?: boolean;
 }
 
 function ZoneRows({
@@ -281,13 +313,17 @@ function ZoneRows({
   onAddRoom,
   onRemoveRoom,
   canRemoveZone,
+  onFocusZone,
+  isFocused,
 }: ZoneRowsProps): JSX.Element {
+  const handleFocus = () => onFocusZone?.(zone.id);
   return (
     <>
       {/* ZONE ROW */}
       <tr
-        className={`zone-row${isCrit ? ' row--crit' : ''}`}
+        className={`zone-row${isCrit ? ' row--crit' : ''}${isFocused ? ' row--focused' : ''}`}
         data-zone-id={zone.id}
+        onClick={handleFocus}
       >
         <td className="col-tag">
           <div className="zone-row__tag-stack">
