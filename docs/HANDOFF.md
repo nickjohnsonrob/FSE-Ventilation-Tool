@@ -113,13 +113,14 @@ Prioritized. Pick from the top.
 
 ### P0 — Fix what's broken or fragile
 
-- [ ] **No state persistence.** Refresh nukes everything; engineers lose 30 min of inputs. Add localStorage autosave (debounced 500ms) of the full `useAhuState` tree. Versioned schema so a future breaking change to the state shape can ignore old saves. Restore on mount if version matches.
-- [ ] **Excel export only keys off active AHU.** Either: (a) one worksheet per AHU in a single workbook, or (b) export all AHUs to a zip. Both already trivial — add a small export modal with radio buttons.
+- [ ] **No state persistence.** Refresh nukes everything; engineers lose 30 min of inputs. **Locked scope (this session):** URL-encoded shareable state wins on load, localStorage is backup + offline, **plus named snapshots** (save-state library, 50-snapshot FIFO cap, Restore / Duplicate-as-new-AHU / Delete / search-by-name). No diff view v1. See "Save-state feature" section below.
+- [ ] **Excel export only keys off active AHU.** **Locked scope:** single workbook, N sheets (one per AHU). Add a small export modal with sheet-name preview.
 - [ ] **No keyboard shortcuts.** Engineers re-tab through this app hundreds of times. Add: `Cmd/Ctrl+Enter` = add zone, `Cmd/Ctrl+Shift+Enter` = add room, `Cmd/Ctrl+R` = reset zones (with confirm). Don't override native browser shortcuts.
+- [ ] **Unit toggle (SI vs IP).** Currently always IP (cfm, ft²). **Locked scope:** IP default, SI opt-in via toggle in header. Affects inputs, results, and Table 6-3 lookups.
 
-### P1 — Restore v1.0.0 features that modern build dropped
+### P1 — Restore v1.0.0 features modern build dropped
 
-- [ ] **Fan-powered terminal box select.** v1 had a `box` (None / Induction / Fan-powered) select that flipped the calculation through `Ep/Fa/Fb/Fc` steps in the trace. v3 dropped it. Re-add as a per-zone dropdown in the meta strip; thread through `compute()` in App.tsx.
+- [ ] **Fan-powered terminal box select.** v1 had a `box` (None / Induction / Fan-powered) select that flipped the calculation through `Ep/Fa/Fb/Fc` steps in the trace. v3 dropped it. **Locked scope (this session):** default **Single-duct TU**, Fan-powered opt-in. (Induction box deferred — out of scope unless asked.) Re-add as a per-zone dropdown in the meta strip; thread through `compute()` in App.tsx.
 - [ ] **DR (Default) / DC / DC+ system type selection per AHU.** v1 had this; v3 doesn't show it anywhere. Affects whether the equation trace shows §6.2.5.1 Appendix A vs Simplified steps.
 - [ ] **Critical zone override per AHU.** v1 let you pin one zone as the design driver regardless of math; useful when one zone has known-higher occupancy. Add a "Design driver" radio per zone.
 
@@ -129,16 +130,16 @@ Prioritized. Pick from the top.
 - [ ] **Inline edit for AHU name.** Currently the input is in the picker; should also be editable in the AHU tab itself for muscle memory.
 - [ ] **Confirm before Reset zones.** Currently fires instantly. Add a 1-second "click again to confirm" toast.
 - [ ] **Toast notifications** for: room redistributed, zone deleted, AHU removed (currently silent). Bottom-right slide-in, auto-dismiss 2.5s, screen-reader announced.
-- [ ] **Empty states** with onboarding hints: "Click + Add zone to start. Or load an example office / lab / classroom." Add 3 preset loaders (Office, Lab, Classroom) that populate reasonable defaults.
+- [ ] **Empty states + presets.** **Locked scope (this session):** preset loader menu with **all ASHRAE Table 6-3 categories**, grouped by category group (Educational / Healthcare / Retail / Office / Public Assembly / etc.) so it's browsable. Each row populates reasonable defaults (area, pop, Rp, Ra, Ez). One-click.
 
 ### P2 — Engineering-grade features
 
 - [ ] **ASHRAE Standard compliance link out.** Each Table 6-3 / 5-5-5 row should link to the official standard preview (free PDF on ashrae.org). Engineers will absolutely click this.
-- [ ] **Unit toggle** (SI vs IP). Currently always IP (cfm, ft²). Add `m³/s`, `m²`. Affects inputs, results, and Table 6-3 lookups.
 - [ ] **Print stylesheet.** Right now `Cmd/Ctrl+P` produces a mess. Add `@media print` rules: hide AHU picker, show only the active AHU, render zone table in full with page breaks per 5 zones.
 - [ ] **PDF export** with the same scope as Excel.
 - [ ] **Multi-AHU export to PDF** (one page per AHU, summary cover page with total cfm).
-- [ ] **Scenario comparison.** Open the same calc twice side-by-side. Easy because state is URL-encoded with a query string — just add a "Compare" button that opens a second instance.
+- [ ] **Favorites per space type.** Star icon next to each Table 6-3 row → adds to a "Favorites" group at the top of the picker. **Locked scope (this session):** per-user (all AHUs share), stored in localStorage. No per-AHU override v1.
+- [ ] **Scenario comparison.** Snapshots + library gives basic compare (pick snapshot A, pick snapshot B, see totals side-by-side). Side-by-side DOM compare is **deferred** unless explicitly asked.
 
 ### P2 — Code health
 
@@ -160,28 +161,64 @@ Prioritized. Pick from the top.
 
 ---
 
+## Save-state feature (locked scope)
+
+Named snapshots, localStorage-backed. Goal: experiment with changes and revert, or look at multiple different scenarios.
+
+**Storage:**
+- localStorage key: `fse.vent.snapshots.v1`
+- Schema: `{ version: 1, snapshots: [{ id, name, createdAt, state }] }`
+- Cap: 50 snapshots, FIFO eviction. localStorage ~5 MB so 50 × 10 KB is comfortable.
+- `id` = uuid v4; `name` defaults to `Snapshot ${n}`, user can rename inline.
+- `state` = the full `useAhuState` tree (just JSON-stringify the array; trivial).
+
+**UI:**
+- Header button: 💾 **Save state** → captures current state, opens a small inline input to name it (default `Snapshot N`), user can edit before saving.
+- Header button: 📚 **Library** → modal listing all snapshots. Columns: name, createdAt, AHU count, total Vot across all AHUs. Each row: **Restore** (replace current state, with confirm), **Duplicate as new AHU** (no destructive — adds as a fresh AHU), **Delete** (with confirm). Search box filters by name.
+- Empty state: "No saved scenarios yet. Click 💾 to capture your current work."
+- Restoring a snapshot overwrites the current state; offer "Save current state before restoring?" as a one-click save prompt.
+- Snapshots persist independently of the active state — deleting the active AHU doesn't delete snapshots.
+
+**Wire:**
+- `lib/storage/snapshots.ts` — load / save / add / remove / rename / cap.
+- `hooks/useAhuState.ts` — no change (snapshots read/write state externally).
+- `components/SnapshotSave.tsx`, `components/SnapshotLibrary.tsx` — new.
+- `Header.tsx` — add the two buttons.
+
+**Tests:**
+- vitest: `snapshots.test.ts` — add/remove/rename, FIFO cap at 51, schema versioning, name uniqueness not enforced (allow duplicates).
+- Playwright: `snapshots.spec.ts` — save state, open library, restore, verify state replaced; save-and-restore-then-modify round-trip.
+
+Approx 150 LOC + 80 LOC tests.
+
+---
+
 ## Where to start (suggested first PR)
 
-**`feature/persistence-localstorage`** — implements the P0 #1 item. Self-contained, low-risk, high-impact. Engineers will notice immediately.
+**`feature/unit-toggle`** — locked P0 scope, smallest surface area, validates the build pipeline before tackling the bigger persistence work.
 
-1. Add `lib/storage.ts` with `loadState()` / `saveState()` / `clearState()` and a schema version constant.
-2. Extend `useAhuState.ts` with a `useEffect` that subscribes to state changes (debounced 500ms) and calls `saveState`.
-3. Add a `useEffect` on mount that calls `loadState()`; if version matches, replace initial state.
-4. Add a "Reset all" button in the Header (next to Theme toggle) that clears storage + state.
-5. Test: write a vitest that mutates state, waits 600ms, asserts localStorage was written; reload component, asserts state restored.
-6. Update the existing Playwright `multi-unit.spec.ts` to add a session-restore scenario.
+1. Add `lib/units.ts` extension: `units` enum, `convert()` helpers for area (ft² ↔ m²), airflow (cfm ↔ m³/s), population density.
+2. Add `UnitsToggle.tsx` in Header.
+3. Add `units` field to `AhuInput` (optional, defaults to `'ip'`).
+4. Wrap input values in App.tsx with display converters (stored value is canonical IP, display toggles).
+5. Wrap results in `ResultsBand.tsx` and `EffZoneChart.tsx` with display converters.
+6. Tests: vitest for `convert()` round-trips; Playwright for the toggle visibly changing displayed values.
 
-Approx 100 LOC + 30 LOC tests. ~2 hours including Playwright.
+Approx 200 LOC + 60 LOC tests. ~3 hours.
+
+**Then:** `feature/persistence-and-snapshots` (P0 #1, biggest piece), `feature/box-select` (P1), `feature/presets-and-favorites` (P1), `feature/multi-ahu-excel-export` (P0).
 
 ---
 
 ## Open questions (worth asking the user before sinking time)
 
-1. **Persistence — localStorage or URL-based?** URL-based is shareable ("send this calc to your colleague") but URLs get long. localStorage is private but not shareable. Could do both.
-2. **Multi-AHU export format — single workbook with N sheets, or zip of N files?** User preference. Single workbook is more user-friendly; zip is more grep-able.
-3. **Unit system — IP-only, SI-only, or toggle?** v1 was IP-only. ASHRAE Standard is dual-units but most US engineers stay in IP.
-4. **Examples / presets** — which 3 to ship? Office / Lab / Classroom is my guess. Confirm with user.
-5. **Box select (None / Induction / Fan-powered)** — should this default to "None" and require user opt-in, or default to "Fan-powered" (most common in commercial)?
+1. ~~Persistence — localStorage or URL-based?~~ **Locked: both (URL wins on load, localStorage as backup).**
+2. ~~Multi-AHU export format — single workbook with N sheets, or zip of N files?~~ **Locked: single workbook, N sheets.**
+3. ~~Unit system — IP-only, SI-only, or toggle?~~ **Locked: toggle, IP default.**
+4. ~~Examples / presets — which 3 to ship?~~ **Locked: all ASHRAE categories, grouped menu.**
+5. ~~Box select default?~~ **Locked: Single-duct TU default, Fan-powered opt-in.**
+6. **Induction box** — included in the box-select dropdown, or out of scope for v1? You said "Single-duct TU with fan-powered as an option" so I'm assuming only two choices in the dropdown (no induction). Confirm?
+7. **URL shareable state length** — when state grows (multiple AHUs, all zones, all rooms), URLs get long. Some browsers cap at ~2 KB. Acceptable as-is, or do we use a hash fragment (`#state=...`) and store the full state in IndexedDB keyed by hash?
 
 ---
 
