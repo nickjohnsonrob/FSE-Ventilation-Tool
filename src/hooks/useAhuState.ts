@@ -427,6 +427,35 @@ export function useAhuState(): AhuStateApi {
     [activeId],
   );
 
+  const reorderZones = useCallback(
+    (newOrder: string[]) => {
+      setAhus((prev) =>
+        prev.map((a) => {
+          if (a.id !== activeId) return a;
+          const byId = new Map(a.zones.map((z) => [z.id, z] as const));
+          // Resolve the requested order against the existing zones. Unknown
+          // ids are silently dropped; zones not present in `newOrder` keep
+          // their relative position at the end (preserves the "drop into
+          // empty list" case without data loss).
+          const resolved: ZoneInput[] = [];
+          const seen = new Set<string>();
+          for (const id of newOrder) {
+            const z = byId.get(id);
+            if (z && !seen.has(id)) {
+              resolved.push(z);
+              seen.add(id);
+            }
+          }
+          for (const z of a.zones) {
+            if (!seen.has(z.id)) resolved.push(z);
+          }
+          return { ...a, zones: resolved };
+        }),
+      );
+    },
+    [activeId],
+  );
+
   return {
     ahus,
     activeId,
