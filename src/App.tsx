@@ -62,6 +62,7 @@ export function App(): JSX.Element {
           onSelect={ahu.setActive}
           onAdd={ahu.addUnit}
           onRemove={ahu.removeUnit}
+          onRename={ahu.renameAhu}
         />
 
         <MethodSwitcher
