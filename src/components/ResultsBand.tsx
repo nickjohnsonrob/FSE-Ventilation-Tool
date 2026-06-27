@@ -1,15 +1,20 @@
 import type { AhuInput, MultiZoneResult, SingleZoneResult } from '../lib/ashrae621';
 import { fmtCfm, fmtPct, fmtRatio } from '../lib/format';
+import type { Units } from '../lib/units';
 
 export interface ResultsBandProps {
   ahu: AhuInput;
   result: MultiZoneResult | SingleZoneResult;
+  /** Active unit system for display. Optional — defaults to I-P. */
+  unitSystem?: Units;
   open: boolean;
   onToggle: () => void;
 }
 
 export function ResultsBand({
   result,
+  // Plumbed for P0.3 — currently unused; render logic lives in that card.
+  unitSystem: _unitSystem = 'ip',
   open,
   onToggle,
 }: ResultsBandProps): JSX.Element {

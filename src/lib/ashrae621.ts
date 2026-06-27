@@ -126,6 +126,16 @@ export interface AhuInput {
   szMode?: 'critical' | 'lumped';
   /** Multizone only: show rooms sub-table. */
   roomsEnabled?: boolean;
+  /**
+   * System ventilation type per ASHRAE 62.1 §6.2.5 / §6.2.6.
+   * - `DR`   — Dilution (recirculating), §6.2.5.1 Simplified path
+   * - `DC`   — Distribution-controlled (Appendix A full)
+   * - `DC+`  — DC with enhanced fan power allowance (informational)
+   *
+   * Optional. Default `undefined` is treated as `DR` at runtime by the math core.
+   * Types-only addition — no behavior change yet. UI + math follow in subsequent PRs.
+   */
+  systemType?: 'DR' | 'DC' | 'DC+';
 }
 
 /** Per-zone calculation result (multi-zone mode). */
