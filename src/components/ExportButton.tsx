@@ -1,96 +1,41 @@
-import ExcelJS from 'exceljs';
-import type { AhuInput, MultiZoneResult, SingleZoneResult } from '../lib/ashrae621';
+import type { AhuInput } from '../lib/ashrae621';
 import { compute } from '../lib/ashrae621';
+import { buildWorkbook } from '../lib/excelExport';
 
 export interface ExportButtonProps {
-  ahu: AhuInput;
+  /**
+   * The full list of AHUs to include in the workbook. One sheet-set
+   * (Inputs / Calc / Summary) is produced per AHU, in declaration order.
+   * For the single-AHU case the output matches the legacy three-sheet
+   * export so existing review workflows are unaffected.
+   */
+  ahus: AhuInput[];
+  /**
+   * The currently-active AHU id. Its sheet-set gets a yellow tab color so
+   * a reviewer can see at a glance which AHU was on screen when the file
+   * was generated. Unknown ids simply mean no AHU gets the active marker.
+   */
+  activeId: string;
 }
 
 /**
- * Export the project to an .xlsx workbook. Three tabs:
- *   1. Inputs  — the AHU state, all zones
- *   2. Calc    — per-zone derived values
- *   3. Summary — Vot, Ev, Xs, %OA
+ * Export the project to an .xlsx workbook. One sheet-set per AHU:
+ *   {AHU name} - Inputs     — every zone's user-input fields
+ *   {AHU name} - Calc       — per-zone derived values (Rp/Ra/Ez/Vbz/Voz/Ep/Zd/Evz)
+ *   {AHU name} - Summary    — Vot, Vou, Ev, Xs, %OA, # zones, critical zone
+ *
+ * The active AHU's sheets get a yellow tab color (FFFFE082) so the
+ * reviewer can spot which unit was being worked on. Sheet names are
+ * truncated to 31 chars (Excel limit) with the suffix preserved.
  */
-export function ExportButton({ ahu }: ExportButtonProps): JSX.Element {
+export function ExportButton({ ahus, activeId }: ExportButtonProps): JSX.Element {
   const onClick = async (): Promise<void> => {
-    const wb = new ExcelJS.Workbook();
-    wb.creator = 'FSE Ventilation Tool';
-    wb.created = new Date();
-
-    const inputs = wb.addWorksheet('Inputs');
-    inputs.columns = [
-      { header: 'Tag', key: 'tag', width: 12 },
-      { header: 'Space', key: 'space', width: 30 },
-      { header: 'Area (ft²)', key: 'area', width: 12 },
-      { header: 'Pop', key: 'pop', width: 8 },
-      { header: 'Vpz (cfm)', key: 'vpz', width: 12 },
-      { header: 'Vdz (cfm)', key: 'vdz', width: 12 },
-      { header: 'Vdzm (cfm)', key: 'vdzm', width: 12 },
-      { header: 'Ez config', key: 'ezConfig', width: 50 },
-    ];
-    for (const z of ahu.zones) {
-      inputs.addRow({
-        tag: z.tag ?? '',
-        space: z.space,
-        area: z.area,
-        pop: z.pop,
-        vpz: z.vpz,
-        vdz: z.vdz,
-        vdzm: z.vdzm ?? 0,
-        ezConfig: z.ezConfig,
-      });
-    }
-
-    const r = compute(ahu);
-    const isMulti = 'vou' in r;
-    const multi = isMulti ? (r as MultiZoneResult) : null;
-    const single = !isMulti ? (r as SingleZoneResult) : null;
-    const calc = wb.addWorksheet('Calc');
-    calc.columns = [
-      { header: 'Tag', key: 'tag', width: 12 },
-      { header: 'Rp', key: 'rp', width: 10 },
-      { header: 'Ra', key: 'ra', width: 10 },
-      { header: 'Ez', key: 'ez', width: 10 },
-      { header: 'Vbz', key: 'vbz', width: 10 },
-      { header: 'Voz', key: 'voz', width: 10 },
-      { header: 'Ep', key: 'ep', width: 10 },
-      { header: 'Zd', key: 'zd', width: 10 },
-      { header: 'Evz', key: 'evz', width: 10 },
-    ];
-    if (multi) {
-      for (const row of multi.rows) {
-        calc.addRow({
-          tag: row.z.tag ?? '',
-          rp: row.rp,
-          ra: row.ra,
-          ez: row.ez,
-          vbz: row.vbz,
-          voz: row.voz,
-          ep: row.ep,
-          zd: row.zd,
-          evz: row.evz,
-        });
-      }
-    }
-
-    const vot = multi ? multi.vot : single!.vot;
-    const summary = wb.addWorksheet('Summary');
-    summary.columns = [
-      { header: 'Quantity', key: 'k', width: 30 },
-      { header: 'Value', key: 'v', width: 20 },
-      { header: 'Notes', key: 'n', width: 50 },
-    ];
-    summary.addRows([
-      { k: 'Vot', v: vot, n: 'Total outdoor airflow, cfm' },
-      { k: 'Vou', v: multi ? multi.vou : '—', n: 'Uncorrected OA, cfm' },
-      { k: 'Ev', v: multi ? multi.ev : 1, n: 'System ventilation efficiency' },
-      { k: 'Xs', v: multi ? multi.xs : '—', n: 'System OA fraction' },
-      { k: '%OA', v: multi ? multi.oaPct : single!.oaPct, n: 'Vot / Vps' },
-    ]);
+    const wb = buildWorkbook(ahus, activeId, compute);
 
     const buf = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const blob = new Blob([buf], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -51,7 +51,7 @@ export function App(): JSX.Element {
         title="FSE Ventilation Calculation"
         subtitle="ANSI/ASHRAE 62.1-2022 Ventilation Rate Procedure"
       >
-        <ExportButton ahu={ahu.ahu} />
+        <ExportButton ahus={ahu.ahus} activeId={ahu.activeId} />
         <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
       </Header>
 
