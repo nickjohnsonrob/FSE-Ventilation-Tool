@@ -1371,3 +1371,192 @@ button {
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* ---- Preset menu (ASHRAE Table 6-3 loader) ---- */
+
+.zone-row.row--focused {
+  outline: 2px solid var(--ac);
+  outline-offset: -2px;
+}
+
+.preset-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.preset-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 360px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.preset-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--sunken);
+}
+
+.preset-menu__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.preset-menu__close {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--mut);
+  padding: 0 4px;
+}
+.preset-menu__close:hover { color: var(--ink); }
+
+.preset-menu__search {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.preset-menu__search input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.preset-menu__search input:focus {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+
+.preset-menu__target {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.preset-menu__target label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--sec);
+}
+.preset-menu__target select {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.preset-menu__target-hint {
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.preset-menu__groups {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.preset-menu__empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--mut);
+  font-size: 12px;
+}
+
+.preset-group {
+  border-bottom: 1px solid var(--line);
+}
+.preset-group:last-child { border-bottom: 0; }
+
+.preset-group__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+}
+.preset-group__header:hover { background: var(--sunken); }
+.preset-group__chev {
+  color: var(--mut);
+  font-size: 10px;
+  width: 12px;
+}
+.preset-group__name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.preset-group__count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.preset-group__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px 0;
+}
+
+.preset-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: transparent;
+  border: 0;
+  padding: 6px 12px 6px 28px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  border-radius: 0;
+}
+.preset-row:hover:not(:disabled) {
+  background: var(--acq);
+}
+.preset-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.preset-row__name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.preset-row__meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--mut);
+}
