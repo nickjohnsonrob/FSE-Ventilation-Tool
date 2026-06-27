@@ -86,6 +86,7 @@ export function App(): JSX.Element {
           onPatchRoom={ahu.patchRoom}
           onAddRoom={ahu.addRoom}
           onRemoveRoom={ahu.removeRoom}
+          onReorderZones={ahu.reorderZones}
           onShowEzHelp={() => setEzHelpOpen(true)}
         />
 
