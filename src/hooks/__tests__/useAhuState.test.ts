@@ -172,4 +172,39 @@ describe('useAhuState', () => {
     expect(result.current.activeId).toBe(activeBefore);
     expect(result.current.ahu.name).toBe('RTU-WEST');
   });
+
+  it('setSystemType updates the AHU and persists across re-renders', () => {
+    const { result } = renderHook(() => useAhuState());
+    const id = result.current.ahus[0].id!;
+    act(() => result.current.setSystemType(id, 'DC'));
+    expect(result.current.ahu.systemType).toBe('DC');
+    // Re-render by adding then removing a zone — setSystemType value should persist
+    act(() => result.current.addZone());
+    act(() =>
+      result.current.removeZone(result.current.ahu.zones[result.current.ahu.zones.length - 1].id),
+    );
+    expect(result.current.ahu.systemType).toBe('DC');
+    // Switching to DC+
+    act(() => result.current.setSystemType(id, 'DC+'));
+    expect(result.current.ahu.systemType).toBe('DC+');
+    // Switching back to DR
+    act(() => result.current.setSystemType(id, 'DR'));
+    expect(result.current.ahu.systemType).toBe('DR');
+  });
+
+  it('new AHU defaults to systemType=DR', () => {
+    const { result } = renderHook(() => useAhuState());
+    let addedId = '';
+    act(() => {
+      addedId = result.current.addUnit('multizone');
+    });
+    const added = result.current.ahus.find((a) => a.id === addedId)!;
+    expect(added.systemType).toBe('DR');
+  });
+
+  it('seed AHU defaults to systemType=DR', () => {
+    const { result } = renderHook(() => useAhuState());
+    // Before any setSystemType call, the seed AHU should already be 'DR'
+    expect(result.current.ahu.systemType).toBe('DR');
+  });
 });

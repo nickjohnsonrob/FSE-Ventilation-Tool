@@ -12,6 +12,7 @@ import {
   calcXs,
   calcZd,
   compute,
+  buildTraceSteps,
   type AhuInput,
   type MultiZoneResult,
   type SingleZoneResult,
@@ -303,7 +304,7 @@ describe('compute() — multi-zone Appendix A', () => {
     expect(r.rows[0].fb).toBeCloseTo(0.5, 3);
     expect(r.rows[0].fc).toBeCloseTo(0.925, 3);
     expect(r.rows[0].voz).toBeCloseTo(110 / 0.7, 2);
-    expect(r.rows[0].zpz).toBeCloseTo((110 / 0.7) / 400, 3);
+    expect(r.rows[0].zpz).toBeCloseTo(110 / 0.7 / 400, 3);
     expect(r.rows[0].evz).toBeCloseTo(0.9411, 3);
     expect(r.evA).toBeCloseTo(0.9411, 3);
   });
@@ -682,5 +683,121 @@ describe('compute() — property tests', () => {
     expect(calcVot(220, 1.0)).toBeCloseTo(220, 2);
     expect(calcVot(220, 0.8)).toBeCloseTo(275, 2);
     expect(calcVot(220, 0.5)).toBeCloseTo(440, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// systemType — DR / DC / DC+ trace shape + Vot invariance
+//
+// Trace step count is a UI/display concern but it's a pure function of the
+// AHU shape + math result, so we test it here via the extracted
+// `buildTraceSteps` helper. The math core is intentionally untouched —
+// switching systemType only adds/extends explanation steps.
+//
+// Per ASHRAE 62.1-2022 + industry practice:
+//   DR  — Default. Single-zone or multi-zone with recirculated air, no
+//         return-path distinction. Current behavior. 4 trace steps.
+//   DC  — Dual-Conduit (DOAS-style). Adds V_tr (transfer-air) step.
+//         5 trace steps.
+//   DC+ — Dual-Conduit plus return-air analysis. Adds V_tr + comparison
+//         step relating V_ot and V_tr. 6 trace steps.
+//
+// Critical invariant: V_ot value is UNCHANGED across DR/DC/DC+. Only the
+// trace explanation changes.
+// ---------------------------------------------------------------------------
+describe('ASHRAE 62.1 — systemType trace shape', () => {
+  // Same multizone Appendix-A fixture used across the three systemType cases.
+  // Two identical office TUs → Vou=220, Xs≈0.183, Ev=1, Vot=220 cfm.
+  const baseAhu: AhuInput = {
+    type: 'multizone',
+    method: 'appendixA',
+    psAuto: true,
+    ps: 0,
+    vpsAuto: true,
+    vps: 0,
+    zones: [
+      {
+        id: 'z1',
+        tag: 'TU-1-01',
+        space: 'Office space',
+        area: 1000,
+        pop: 10,
+        vpz: 600,
+        vdz: 600,
+        ezConfig: 'Ceiling supply of cool air',
+        box: 'single',
+        er: 0,
+      },
+      {
+        id: 'z2',
+        tag: 'TU-1-02',
+        space: 'Office space',
+        area: 1000,
+        pop: 10,
+        vpz: 600,
+        vdz: 600,
+        ezConfig: 'Ceiling supply of cool air',
+        box: 'single',
+        er: 0,
+      },
+    ],
+  };
+
+  it('DR (default): trace has 4 steps', () => {
+    const ahu: AhuInput = { ...baseAhu, systemType: 'DR' };
+    const r = asMulti(compute(ahu));
+    const steps = buildTraceSteps(ahu, r, r.rows[0].z.id);
+    expect(steps).toHaveLength(4);
+  });
+
+  it('DR when systemType is undefined: trace has 4 steps (treated as default)', () => {
+    const ahu: AhuInput = { ...baseAhu }; // systemType omitted
+    const r = asMulti(compute(ahu));
+    const steps = buildTraceSteps(ahu, r, r.rows[0].z.id);
+    expect(steps).toHaveLength(4);
+  });
+
+  it('DC: trace has 5 steps (extra V_tr)', () => {
+    const ahu: AhuInput = { ...baseAhu, systemType: 'DC' };
+    const r = asMulti(compute(ahu));
+    const steps = buildTraceSteps(ahu, r, r.rows[0].z.id);
+    expect(steps).toHaveLength(5);
+    // V_tr comes BEFORE the Vot summary step.
+    // Step indices: Voz=0, Zd=1, Evz=2, V_tr=3, Vot=4.
+    expect(steps[3].sym).toBe('V_tr');
+    // Vot is always last
+    expect(steps[steps.length - 1].sym).toBe('Vot');
+  });
+
+  it('DC+: trace has 6 steps (V_tr + comparison)', () => {
+    const ahu: AhuInput = { ...baseAhu, systemType: 'DC+' };
+    const r = asMulti(compute(ahu));
+    const steps = buildTraceSteps(ahu, r, r.rows[0].z.id);
+    expect(steps).toHaveLength(6);
+    // V_tr + comparison come BEFORE the Vot summary step.
+    // Step indices for multizone, no-fan: Voz=0, Zd=1, Evz=2, V_tr=3,
+    // comparison=4, Vot=5.
+    expect(steps[3].sym).toBe('V_tr');
+    // Comparison step references both V_ot and V_tr
+    const compare = steps[4];
+    expect(compare.formula).toMatch(/V_ot|V_tr/);
+    // Vot is always last
+    expect(steps[steps.length - 1].sym).toBe('Vot');
+  });
+
+  it('Vot value is identical across DR/DC/DC+ (critical invariant)', () => {
+    const dr: AhuInput = { ...baseAhu, systemType: 'DR' };
+    const dc: AhuInput = { ...baseAhu, systemType: 'DC' };
+    const dcp: AhuInput = { ...baseAhu, systemType: 'DC+' };
+    const rDr = asMulti(compute(dr));
+    const rDc = asMulti(compute(dc));
+    const rDcp = asMulti(compute(dcp));
+    // systemType is a display/explanation feature only — it must NOT change
+    // the math output. Vou, Ev, and Vot are all identical.
+    expect(rDr.vot).toBeCloseTo(rDc.vot, 6);
+    expect(rDr.vot).toBeCloseTo(rDcp.vot, 6);
+    expect(rDr.vou).toBeCloseTo(rDc.vou, 6);
+    expect(rDr.ev).toBeCloseTo(rDc.ev, 6);
+    expect(rDr.vot).toBeCloseTo(220, 2); // the math pin
   });
 });

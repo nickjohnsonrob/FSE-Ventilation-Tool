@@ -57,7 +57,7 @@
 /* Dark theme overrides applied via [data-theme="dark"] on <html> */
 :root[data-theme='dark'] {
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* =============================================================================
@@ -483,7 +483,6 @@ button {
   margin-top: var(--sp-4);
 }
 
-
 /* =====================================================================
  * AHU PICKER (unit rail) — matches v1.0.0 chip row
  * ===================================================================== */
@@ -528,7 +527,9 @@ button {
   cursor: pointer;
   font: inherit;
   flex: none;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .ahu-tab:hover {
@@ -572,7 +573,7 @@ button {
   color: var(--ac2);
 }
 
-.ahu-tab__name[title*="double-click"]:hover {
+.ahu-tab__name[title*='double-click']:hover {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
@@ -594,6 +595,34 @@ button {
 }
 
 .ahu-tab__name-input:focus {
+  box-shadow: 0 0 0 2px var(--acq);
+}
+
+/* P1.3 — system-type dropdown on the active tab. Inline next to the AHU
+   name so the engineer can flip DR/DC/DC+ without leaving the picker rail.
+   Subdued by default; reads as a setting, not a primary action. */
+.ahu-tab__system-type {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ac2);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 4px;
+  cursor: pointer;
+  outline: none;
+  /* match tab compactness */
+  line-height: 1.2;
+}
+
+.ahu-tab__system-type:hover {
+  border-color: var(--ac);
+}
+
+.ahu-tab__system-type:focus {
+  border-color: var(--ac);
   box-shadow: 0 0 0 2px var(--acq);
 }
 
@@ -966,7 +995,9 @@ button {
   justify-content: center;
   border-radius: 3px;
   padding: 0;
-  transition: transform 120ms ease, color 120ms ease;
+  transition:
+    transform 120ms ease,
+    color 120ms ease;
 }
 
 .zone-row__chev:hover {
@@ -974,7 +1005,7 @@ button {
   color: var(--ink);
 }
 
-.zone-row__chev[aria-expanded="true"] {
+.zone-row__chev[aria-expanded='true'] {
   transform: rotate(90deg);
   color: var(--ac2);
 }
@@ -1350,13 +1381,23 @@ button {
 }
 
 @keyframes vrpFade {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes vrpGrow {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 /* Two-column analysis layout (chart | trace) on wide screens */
@@ -1375,7 +1416,7 @@ button {
 
 /* ---- Locked zone inputs (Σ rooms drives the zone) ---- */
 
-.zone-table__main input[type="number"]:disabled {
+.zone-table__main input[type='number']:disabled {
   background: var(--sunken);
   color: var(--mut);
   cursor: not-allowed;
@@ -1450,7 +1491,9 @@ button {
   color: var(--mut);
   padding: 0 4px;
 }
-.preset-menu__close:hover { color: var(--ink); }
+.preset-menu__close:hover {
+  color: var(--ink);
+}
 
 .preset-menu__search {
   padding: 8px 10px;
@@ -1514,7 +1557,9 @@ button {
 .preset-group {
   border-bottom: 1px solid var(--line);
 }
-.preset-group:last-child { border-bottom: 0; }
+.preset-group:last-child {
+  border-bottom: 0;
+}
 
 .preset-group__header {
   width: 100%;
@@ -1529,7 +1574,9 @@ button {
   text-align: left;
   color: var(--ink);
 }
-.preset-group__header:hover { background: var(--sunken); }
+.preset-group__header:hover {
+  background: var(--sunken);
+}
 .preset-group__chev {
   color: var(--mut);
   font-size: 10px;

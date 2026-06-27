@@ -63,6 +63,7 @@ export function App(): JSX.Element {
           onAdd={ahu.addUnit}
           onRemove={ahu.removeUnit}
           onRename={ahu.renameAhu}
+          onSystemTypeChange={ahu.setSystemType}
         />
 
         <MethodSwitcher
@@ -114,9 +115,7 @@ export function App(): JSX.Element {
         </p>
       </footer>
 
-      {ezHelpOpen && (
-        <EzHelpDialog rows={EZ_CONFIGS} onClose={() => setEzHelpOpen(false)} />
-      )}
+      {ezHelpOpen && <EzHelpDialog rows={EZ_CONFIGS} onClose={() => setEzHelpOpen(false)} />}
     </div>
   );
 }

@@ -28,11 +28,7 @@
  * @see ANSI/ASHRAE Standard 62.1-2022, Sections 6.2 and Normative Appendix A
  */
 
-import {
-  EZ_BY_LABEL,
-  OCCUPANCY_CATEGORIES,
-  TABLE_6_3_BREAKPOINTS,
-} from './tables';
+import { EZ_BY_LABEL, OCCUPANCY_CATEGORIES, TABLE_6_3_BREAKPOINTS } from './tables';
 import type { SimplifiedMethod } from './tables';
 export type { SimplifiedMethod };
 
@@ -318,7 +314,11 @@ export function calcZd(voz: number, vdzm: number): number {
  *   Fb = Ep
  *   Fc = 1 - (1 - Ez) · (1 - Er) · (1 - Ep)
  */
-export function calcEvzCoeffs(ep: number, er: number, ez: number): {
+export function calcEvzCoeffs(
+  ep: number,
+  er: number,
+  ez: number,
+): {
   fa: number;
   fb: number;
   fc: number;
@@ -445,7 +445,10 @@ export function calcVpzMinRequired(voz: number): number {
  * critical-room rollup: Voz_TU = max(Voz_i / Vpz_i) · ΣVpz_i.
  * See JSDoc on ZoneInput for the reasoning.
  */
-export function calcZoneBase(z: ZoneInput, ezMap?: Map<string, number>): {
+export function calcZoneBase(
+  z: ZoneInput,
+  ezMap?: Map<string, number>,
+): {
   rp: number;
   ra: number;
   ez: number;
@@ -469,7 +472,7 @@ export function calcZoneBase(z: ZoneInput, ezMap?: Map<string, number>): {
   const ezLookup = ezMap ?? EZ_BY_LABEL;
   const fan = z.box !== 'single';
   const hasRooms = !!z.rooms && z.rooms.length > 0;
-  const drive = hasRooms && (z.roomsDrive !== false);
+  const drive = hasRooms && z.roomsDrive !== false;
 
   let roomCalcs: RoomResult[] | null = null;
   let critRoomId: string | null = null;
@@ -863,4 +866,167 @@ export function calcSingleZone(ahu: AhuInput): SingleZoneResult {
  */
 export function compute(ahu: AhuInput): MultiZoneResult | SingleZoneResult {
   return ahu.type === 'singlezone' ? calcSingleZone(ahu) : calcMultiZone(ahu);
+}
+
+// ============================================================================
+// Equation-trace step builder — extracted from EquationTrace.tsx so the step
+// shape is testable as a pure function (matches the FSE pattern: pure math
+// core in `lib/`, thin React renderer in `components/`).
+//
+// Trace step count by `systemType` (added in P1.2):
+//   DR  — 4 steps (Voz, Ep/Fa/Fb/Fc, Zd, Evz, Vot  →  4)
+//   DC  — 5 steps (DR + V_tr transfer-air step)
+//   DC+ — 6 steps (DC + V_ot vs V_tr comparison step)
+//
+// The math core's V_ot is unchanged across systemType; this function only
+// adds explanation rows. See `ashrae621.test.ts > systemType trace shape`.
+// ============================================================================
+
+/**
+ * One row in the equation trace. Mirrors the TraceStep shape used by
+ * `EquationTrace.tsx`; kept in the math core so the renderer can be a thin
+ * pass-through.
+ */
+export interface TraceStep {
+  sym: string;
+  formula: string;
+  sub: string;
+  out: string;
+  /** Highlight class for the symbol/out: 'ink' (default), 'ok', 'warn', 'crit'. */
+  tone: 'ink' | 'ok' | 'warn' | 'crit';
+}
+
+/** System ventilation type — re-export of the AhuInput field. */
+export type SystemType = NonNullable<AhuInput['systemType']>;
+
+/**
+ * Build the ordered list of trace steps for the given AHU + result, scoped
+ * to a single selected zone.
+ *
+ * Pure function — no React, no DOM. Safe to call from tests. The
+ * `EquationTrace.tsx` component calls this and renders the rows.
+ *
+ * @param ahu   the AHU shape; only `systemType` is read here
+ * @param result the compute() output; passed in by the caller (already
+ *               memoized in App.tsx)
+ * @param selId the zone id currently selected in the trace dropdown
+ */
+export function buildTraceSteps(
+  ahu: AhuInput,
+  result: MultiZoneResult | SingleZoneResult,
+  selId: string | null,
+): TraceStep[] {
+  const f = (n: number, p = 1): string => (Number.isFinite(n) ? n.toFixed(p) : '—');
+
+  const isMulti = 'vou' in result;
+  const multi = isMulti ? (result as MultiZoneResult) : null;
+  const rows: ZoneResult[] = 'rows' in result ? result.rows : [];
+  const defaultId = multi?.crit?.z.id ?? multi?.rows[0]?.z.id ?? rows[0]?.z.id ?? null;
+  const selIdSafe = selId !== null && rows.some((r) => r.z.id === selId) ? selId : defaultId;
+  const tr = rows.find((r) => r.z.id === selIdSafe) ?? null;
+
+  if (!tr) return [];
+
+  const out: TraceStep[] = [];
+
+  if (tr.drive && tr.roomCalcs && tr.roomCalcs.length > 0) {
+    // Critical-room rollup
+    const crc = tr.roomCalcs.find((x: RoomResult) => x.id === tr.critRoomId);
+    const tag = crc?.tag ?? '—';
+    out.push({
+      sym: 'Voz',
+      formula: `critical room · ${tag} · Zp,crit · ΣVpz`,
+      sub: `${f(tr.critZp, 3)} × ${f(tr.vpz, 0)}  (${tr.roomCalcs.length} rooms)`,
+      out: `${f(tr.voz, 1)} cfm`,
+      tone: 'ink',
+    });
+  } else {
+    // Lumped: Voz = (Pz·Rp + Az·Ra) / Ez
+    out.push({
+      sym: 'Voz',
+      formula: '(Pz·Rp + Az·Ra) / Ez',
+      sub: `(${f(tr.pop)} · ${f(tr.rp, 1)} + ${f(tr.area, 0)} · ${f(tr.ra, 2)}) / ${f(tr.ez, 1)}`,
+      out: `${f(tr.voz, 1)} cfm`,
+      tone: 'ink',
+    });
+  }
+
+  if (tr.fan) {
+    out.push({
+      sym: 'Ep',
+      formula: 'Vpz / Vdz',
+      sub: `${f(tr.vpz)} / ${f(tr.vdz)}`,
+      out: f(tr.ep, 3),
+      tone: 'ink',
+    });
+    out.push({
+      sym: 'Fa/Fb/Fc',
+      formula: 'recirc factors',
+      sub: `Fa=${f(tr.fa, 2)}  Fb=${f(tr.fb, 2)}  Fc=${f(tr.fc, 2)}`,
+      out: '',
+      tone: 'ink',
+    });
+  }
+
+  out.push({
+    sym: 'Zd',
+    formula: 'Voz / Vdzm  (min discharge)',
+    sub: `${f(tr.voz, 1)} / ${f(tr.vdzm)}`,
+    out: f(tr.zd, 3),
+    tone: 'ink',
+  });
+
+  out.push({
+    sym: 'Evz',
+    formula: '(Fa + Xs·Fb − Zd·Fc) / Fa',
+    sub: multi
+      ? `(${f(tr.fa, 2)} + ${f(multi.xs, 3)}·${f(tr.fb, 2)} − ${f(tr.zd, 3)}·${f(tr.fc, 2)})`
+      : `(single-zone: Ev = 1)`,
+    out: f(tr.evz, 3),
+    tone: tr.evz < 0.9 ? 'warn' : 'ink',
+  });
+
+  // ---- systemType extensions (DR / DC / DC+) ----
+  // DC: add V_tr (transfer air) step.
+  // DC+: also add a V_ot vs V_tr comparison step.
+  const sys: SystemType = ahu.systemType ?? 'DR';
+  if (sys === 'DC' || sys === 'DC+') {
+    if (multi) {
+      // V_tr = V_ou - V_oz,crit (transfer air to the critical zone). On a
+      // DOAS the OA delivered above the critical room's need is bypassed
+      // around the AHJ. This is a display/explanation step only — V_ot is
+      // computed by the math core unchanged.
+      const vOzCrit = tr.voz;
+      const vTr = Math.max(0, multi.vou - vOzCrit);
+      out.push({
+        sym: 'V_tr',
+        formula: 'V_ou − V_oz,crit  (transfer air)',
+        sub: `${f(multi.vou, 0)} − ${f(vOzCrit, 1)}`,
+        out: `${f(vTr, 0)} cfm`,
+        tone: 'ink',
+      });
+      if (sys === 'DC+') {
+        // Comparison step: explains that V_ot already accounts for V_tr.
+        out.push({
+          sym: 'V_ot ↔ V_tr',
+          formula: 'V_ot includes V_tr (no additional OA needed)',
+          sub: `${f(multi.vot, 0)} ≥ ${f(vTr, 0)}`,
+          out: 'OK',
+          tone: 'ok',
+        });
+      }
+    }
+  }
+
+  if (multi) {
+    out.push({
+      sym: 'Vot',
+      formula: `Vou / Ev  (Ev = min(Evz) = ${f(multi.ev, 3)})`,
+      sub: `${f(multi.vou, 0)} / ${f(multi.ev, 3)}`,
+      out: `${f(multi.vot, 0)} cfm`,
+      tone: 'ok',
+    });
+  }
+
+  return out;
 }

@@ -93,6 +93,7 @@ function makeSeedAhu(): AhuInput {
     vpsAuto: false,
     vps: 0,
     zones: makeMultiZoneSeed(),
+    systemType: 'DR',
   };
 }
 
@@ -137,6 +138,17 @@ export interface AhuStateApi {
   setActive: (id: string) => void;
   /** Rename any AHU by id (no-op if id is unknown). Does not change activeId. */
   renameAhu: (id: string, name: string) => void;
+  /**
+   * Set the system ventilation type for any AHU by id.
+   * - 'DR'  — Default / recirculating (no return-path distinction). 4 trace steps.
+   * - 'DC'  — Dual-Conduit / DOAS-style. Adds V_tr step. 5 trace steps.
+   * - 'DC+' — Dual-Conduit plus return-air analysis. 6 trace steps.
+   * No-op if the id is unknown. Does not change activeId.
+   * Critical: this is a display/explanation field — the math core's V_ot
+   * value is intentionally unchanged across systemType (verified in
+   * ashrae621.test.ts).
+   */
+  setSystemType: (id: string, systemType: 'DR' | 'DC' | 'DC+') => void;
 }
 
 export function useAhuState(): AhuStateApi {
@@ -147,18 +159,14 @@ export function useAhuState(): AhuStateApi {
 
   const replaceActive = useCallback(
     (next: AhuInput) => {
-      setAhus((prev) =>
-        prev.map((a) => (a.id === activeId ? { ...next, id: activeId } : a)),
-      );
+      setAhus((prev) => prev.map((a) => (a.id === activeId ? { ...next, id: activeId } : a)));
     },
     [activeId],
   );
 
   const patchActive = useCallback(
     (partial: Partial<AhuInput>) => {
-      setAhus((prev) =>
-        prev.map((a) => (a.id === activeId ? { ...a, ...partial } : a)),
-      );
+      setAhus((prev) => prev.map((a) => (a.id === activeId ? { ...a, ...partial } : a)));
     },
     [activeId],
   );
@@ -210,9 +218,7 @@ export function useAhuState(): AhuStateApi {
     (id: string) => {
       setAhus((prev) =>
         prev.map((a) =>
-          a.id !== activeId
-            ? a
-            : { ...a, zones: a.zones.filter((z) => z.id !== id) },
+          a.id !== activeId ? a : { ...a, zones: a.zones.filter((z) => z.id !== id) },
         ),
       );
     },
@@ -221,9 +227,7 @@ export function useAhuState(): AhuStateApi {
 
   const resetZones = useCallback(() => {
     setAhus((prev) =>
-      prev.map((a) =>
-        a.id !== activeId ? a : { ...a, zones: defaultZoneFor(a.type) },
-      ),
+      prev.map((a) => (a.id !== activeId ? a : { ...a, zones: defaultZoneFor(a.type) })),
     );
   }, [activeId]);
 
@@ -239,9 +243,7 @@ export function useAhuState(): AhuStateApi {
               const rooms = z.rooms ?? [];
               return {
                 ...z,
-                rooms: rooms.map((r) =>
-                  r.id === rid ? { ...r, ...partial } : r,
-                ),
+                rooms: rooms.map((r) => (r.id === rid ? { ...r, ...partial } : r)),
               };
             }),
           };
@@ -319,6 +321,7 @@ export function useAhuState(): AhuStateApi {
         vpsAuto: false,
         vps: 0,
         zones: defaultZoneFor(type),
+        systemType: 'DR',
       };
       return [...prev, next];
     });
@@ -352,6 +355,13 @@ export function useAhuState(): AhuStateApi {
     });
   }, []);
 
+  const setSystemType = useCallback((id: string, systemType: 'DR' | 'DC' | 'DC+') => {
+    setAhus((prev) => {
+      if (!prev.some((a) => a.id === id)) return prev;
+      return prev.map((a) => (a.id === id ? { ...a, systemType } : a));
+    });
+  }, []);
+
   return {
     ahus,
     activeId,
@@ -369,6 +379,7 @@ export function useAhuState(): AhuStateApi {
     removeUnit,
     setActive,
     renameAhu,
+    setSystemType,
   };
 }
 
