@@ -142,4 +142,34 @@ describe('useAhuState', () => {
     expect(result.current.ahu.name).toBe('RTU-NORTH');
     expect(result.current.ahu.condition).toBe('Heating');
   });
+
+  it('renameAhu updates the name of any AHU by id, not just the active one', () => {
+    const { result } = renderHook(() => useAhuState());
+    const firstId = result.current.ahus[0].id!;
+    let secondId = '';
+    act(() => {
+      secondId = result.current.addUnit('singlezone');
+    });
+    // Rename the FIRST AHU even though active is the new one
+    act(() => result.current.renameAhu(firstId, 'RTU-NORTH'));
+    const first = result.current.ahus.find((a) => a.id === firstId)!;
+    const second = result.current.ahus.find((a) => a.id === secondId)!;
+    expect(first.name).toBe('RTU-NORTH');
+    expect(second.name).toBe('DOAS-01'); // unchanged
+  });
+
+  it('renameAhu is a no-op for an unknown id', () => {
+    const { result } = renderHook(() => useAhuState());
+    const before = result.current.ahu.name;
+    act(() => result.current.renameAhu('a-not-real', 'whatever'));
+    expect(result.current.ahu.name).toBe(before);
+  });
+
+  it('renameAhu preserves the active AHU', () => {
+    const { result } = renderHook(() => useAhuState());
+    const activeBefore = result.current.activeId;
+    act(() => result.current.renameAhu(result.current.ahus[0].id!, 'RTU-WEST'));
+    expect(result.current.activeId).toBe(activeBefore);
+    expect(result.current.ahu.name).toBe('RTU-WEST');
+  });
 });

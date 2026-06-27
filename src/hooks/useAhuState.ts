@@ -135,6 +135,8 @@ export interface AhuStateApi {
   removeUnit: (id: string) => void;
   /** Switch the active AHU. */
   setActive: (id: string) => void;
+  /** Rename any AHU by id (no-op if id is unknown). Does not change activeId. */
+  renameAhu: (id: string, name: string) => void;
 }
 
 export function useAhuState(): AhuStateApi {
@@ -341,6 +343,15 @@ export function useAhuState(): AhuStateApi {
 
   const setActive = useCallback((id: string) => setActiveId(id), []);
 
+  const renameAhu = useCallback((id: string, name: string) => {
+    setAhus((prev) => {
+      // No-op if the id doesn't exist — preserves the array reference so
+      // React doesn't re-render on a mistyped call.
+      if (!prev.some((a) => a.id === id)) return prev;
+      return prev.map((a) => (a.id === id ? { ...a, name } : a));
+    });
+  }, []);
+
   return {
     ahus,
     activeId,
@@ -357,6 +368,7 @@ export function useAhuState(): AhuStateApi {
     addUnit,
     removeUnit,
     setActive,
+    renameAhu,
   };
 }
 
