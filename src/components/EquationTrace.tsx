@@ -12,6 +12,7 @@ import type {
   MultiZoneResult,
   RoomResult,
   SingleZoneResult,
+  SystemType,
   ZoneResult,
 } from '../lib/ashrae621';
 import { formatFlow } from '../lib/units';
@@ -36,12 +37,19 @@ interface TraceStep {
 const f = (n: number, p = 1): string => (Number.isFinite(n) ? n.toFixed(p) : '—');
 
 export function EquationTrace({
+  ahu,
   result,
   unitSystem = 'ip',
 }: EquationTraceProps): JSX.Element | null {
   const isMulti = 'vou' in result;
   const multi = isMulti ? (result as MultiZoneResult) : null;
   const rows: ZoneResult[] = 'rows' in result ? result.rows : [];
+
+  // System ventilation type — DR is the default if the field is missing
+  // (back-compat with deserialized / hand-edited fixtures that predate
+  // the dropdown). `systemType` is display-only: Vot math is byte-identical
+  // across all three.
+  const systemType: SystemType = ahu.systemType ?? 'DR';
 
   // Default to the critical zone (multizone) or the only zone (singlezone).
   const defaultId = multi?.crit?.z.id ?? multi?.rows[0]?.z.id ?? rows[0]?.z.id ?? null;
@@ -128,10 +136,57 @@ export function EquationTrace({
         out: votOut,
         tone: 'ok',
       });
+
+      // === System-type trace additions (display-only; vot math unchanged) ===
+      //
+      // ASHRAE 62.1 §6.2.5 / §6.2.6 distinguishes:
+      //   DR   — Dilution (recirculating), simplest path. Vot is the
+      //          single deliverable flow.
+      //   DC   — Distribution-controlled. Adds a transfer-airflow term
+      //          V_tr (the OA stream dedicated to the zones via a
+      //          separate conduit). V_tr = Vou here — the uncorrected
+      //          OA the system delivers before the Ev adjustment.
+      //   DC+  — DC with enhanced fan-power allowance (informational).
+      //          Adds a comparison note: Vot ≥ V_tr when Ev ≤ 1 (Ev is
+      //          a penalty, not a multiplier), so Vot ≥ V_tr always
+      //          holds for valid inputs.
+      //
+      // These additions intentionally do NOT alter Vot. The math core
+      // remains byte-identical across DR/DC/DC+ — verified by the
+      // `V_ot value is UNCHANGED across DR/DC/DC+` Playwright test.
+      if (systemType === 'DC' || systemType === 'DC+') {
+        // V_tr = Vou — uncorrected OA delivered before Ev. This is the
+        // "transfer airflow" term that DC systems document separately
+        // from the system OA requirement Vot. Use the same active-unit
+        // formatter as Vot so the step respects the toggle.
+        const vtrOut = formatFlow(multi.vou, unitSystem);
+        out.push({
+          sym: 'V_tr',
+          formula: 'Vou  (transfer airflow to zones)',
+          sub: `${f(multi.vou, 0)}  (uncorrected OA)`,
+          out: vtrOut,
+          tone: 'ink',
+        });
+      }
+
+      if (systemType === 'DC+') {
+        // DC+ adds an informational comparison step. Ev ≤ 1 by §A-3,
+        // so Vot = Vou / Ev ≥ Vou = V_tr. The step surfaces this as a
+        // ratio so an engineer can verify the design margin at a
+        // glance.
+        const ratio = multi.vou > 0 ? multi.vot / multi.vou : 0;
+        out.push({
+          sym: 'V_ot ↔ V_tr',
+          formula: 'Vot / V_tr = 1 / Ev',
+          sub: `${f(multi.vot, 0)} / ${f(multi.vou, 0)}`,
+          out: ratio > 0 ? `× ${f(ratio, 3)}` : '—',
+          tone: 'ok',
+        });
+      }
     }
 
     return out;
-  }, [tr, multi, unitSystem]);
+  }, [tr, multi, unitSystem, systemType]);
 
   if (rows.length === 0) return null;
 
