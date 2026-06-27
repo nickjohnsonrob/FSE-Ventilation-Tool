@@ -64,14 +64,16 @@ function makeSingleZoneSeed(): ZoneInput[] {
   ];
 }
 
-/** One room seed for the room-within-zone view. */
-function makeRoomSeed(zoneTag: string, idx: number): RoomInput {
+/** One room seed for the room-within-zone view.
+ *  Uses the zone's area/pop as the starting values; the caller is
+ *  responsible for redistributing across all rooms after this. */
+function makeRoomSeed(zoneTag: string, idx: number, area = 250, pop = 2): RoomInput {
   return {
     id: nextRoomId(),
     tag: `${zoneTag}-R${String(idx + 1).padStart(2, '0')}`,
     space: 'Office space',
-    area: 250,
-    pop: 2,
+    area,
+    pop,
     vpz: 150,
     ezConfig: 'Ceiling supply of cool air',
   };
@@ -256,9 +258,16 @@ export function useAhuState(): AhuStateApi {
             ...a,
             zones: a.zones.map((z) => {
               if (z.id !== zid) return z;
-              const idx = (z.rooms ?? []).length;
-              const room = makeRoomSeed(z.tag ?? `Z${idx + 1}`, idx);
-              return { ...z, rooms: [...(z.rooms ?? []), room] };
+              const existing = z.rooms ?? [];
+              const idx = existing.length;
+              // Add a placeholder room, then redistribute area/pop equally
+              // across existing + new so Σ(rooms) = z.area / z.pop.
+              const provisional = [
+                ...existing,
+                makeRoomSeed(z.tag ?? `Z${idx + 1}`, idx, z.area ?? 0, z.pop ?? 0),
+              ];
+              const redistributed = redistributeRooms(provisional, z);
+              return { ...z, rooms: redistributed };
             }),
           };
         }),
@@ -276,7 +285,12 @@ export function useAhuState(): AhuStateApi {
             ...a,
             zones: a.zones.map((z) => {
               if (z.id !== zid) return z;
-              return { ...z, rooms: (z.rooms ?? []).filter((r) => r.id !== rid) };
+              const surviving = (z.rooms ?? []).filter((r) => r.id !== rid);
+              // Redistribute the remaining rooms so Σ(rooms) stays equal
+              // to z.area / z.pop. When the last room is removed, the
+              // zone reverts to using its own area/pop directly.
+              const redistributed = redistributeRooms(surviving, z);
+              return { ...z, rooms: redistributed };
             }),
           };
         }),
@@ -348,3 +362,42 @@ export function useAhuState(): AhuStateApi {
 
 /** Re-export factory for tests / consumers that want a fresh seed without a hook. */
 export const seedFactory = makeSeedAhu;
+
+// ----------------------------------------------------------------------------
+// Room redistribution helpers — preserve zone totals when rooms change.
+//
+// When a zone has rooms, the math core uses Σ(rooms) for area/pop/flow
+// (the "rooms drive TU totals" behavior). To keep the displayed rollup
+// in sync with the zone-level area/pop, we redistribute area/pop equally
+// across all surviving rooms on every add/remove. This matches the
+// "zone level area is maintained" UX the user asked for.
+// ----------------------------------------------------------------------------
+
+/** Redistribute area and pop equally across N rooms. Rounded to 1 decimal
+ *  for display; total is preserved up to floating-point noise. If `pop` is
+ *  not an integer (e.g. after a split), the last room absorbs the remainder. */
+function equalSplit(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  if (n === 1) return [total];
+  const each = Math.floor((total * 10) / n) / 10; // round to 1 dp
+  const out: number[] = [];
+  let assigned = 0;
+  for (let i = 0; i < n - 1; i++) {
+    out.push(each);
+    assigned += each;
+  }
+  // Last room absorbs the rounding remainder so total is exact.
+  out.push(Math.max(0, +(total - assigned).toFixed(1)));
+  return out;
+}
+
+function redistributeRooms(rooms: RoomInput[], z: ZoneInput): RoomInput[] {
+  if (rooms.length === 0) return rooms;
+  const areas = equalSplit(z.area || 0, rooms.length);
+  const pops = equalSplit(z.pop || 0, rooms.length);
+  return rooms.map((r, i) => ({
+    ...r,
+    area: areas[i],
+    pop: pops[i],
+  }));
+}

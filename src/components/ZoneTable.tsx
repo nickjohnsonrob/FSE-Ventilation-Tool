@@ -309,12 +309,21 @@ function ZoneRows({
               onChange={(e) => onPatchZone(zone.id, { tag: e.target.value })}
             />
             {rooms.length > 0 && (
-              <span
-                className="zone-row__room-count"
-                title={`${rooms.length} room${rooms.length === 1 ? '' : 's'}`}
-              >
-                {rooms.length}r
-              </span>
+              <>
+                <span
+                  className="zone-row__room-count"
+                  title={`${rooms.length} room${rooms.length === 1 ? '' : 's'}`}
+                >
+                  {rooms.length}r
+                </span>
+                <span
+                  className="zone-row__rollup-hint"
+                  data-testid={`rollup-hint-${zone.id}`}
+                  title="Zone area/pop is driven by Σ(rooms). Delete all rooms to edit the zone-level values."
+                >
+                  Σ rooms drives
+                </span>
+              </>
             )}
           </div>
         </td>
@@ -335,6 +344,13 @@ function ZoneRows({
             type="number"
             min={0}
             value={Number.isFinite(zone.area) ? zone.area : 0}
+            disabled={rooms.length > 0}
+            data-testid={rooms.length > 0 ? `zone-area-locked-${zone.id}` : `zone-area-${zone.id}`}
+            title={
+              rooms.length > 0
+                ? 'Locked — Σ(rooms) drives the zone total. Delete all rooms to edit.'
+                : undefined
+            }
             onChange={(e) => {
               const v = Number(e.target.value);
               onPatchZone(zone.id, { area: isFinite(v) ? v : 0 });
@@ -346,6 +362,13 @@ function ZoneRows({
             type="number"
             min={0}
             value={Number.isFinite(zone.pop) ? zone.pop : 0}
+            disabled={rooms.length > 0}
+            data-testid={rooms.length > 0 ? `zone-pop-locked-${zone.id}` : `zone-pop-${zone.id}`}
+            title={
+              rooms.length > 0
+                ? 'Locked — Σ(rooms) drives the zone total. Delete all rooms to edit.'
+                : undefined
+            }
             onChange={(e) => {
               const v = Number(e.target.value);
               onPatchZone(zone.id, { pop: isFinite(v) ? v : 0 });
