@@ -50,6 +50,8 @@ export function App(): JSX.Element {
       <Header
         title="FSE Ventilation Calculation"
         subtitle="ANSI/ASHRAE 62.1-2022 Ventilation Rate Procedure"
+        unitSystem={ahu.unitSystem}
+        onToggleUnits={() => ahu.setUnitSystem(ahu.unitSystem === 'ip' ? 'si' : 'ip')}
       >
         <ExportButton ahus={ahu.ahus} activeId={ahu.activeId} />
         <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
@@ -100,9 +102,9 @@ export function App(): JSX.Element {
             for §6.2.5.1 — Ev is always 1) but still get the trace. */}
         <div className="analysis-grid">
           {result && 'rows' in result && 'vou' in result && (
-            <EffZoneChart ahu={ahu.ahu} result={result} />
+            <EffZoneChart ahu={ahu.ahu} result={result} unitSystem={ahu.unitSystem} />
           )}
-          <EquationTrace ahu={ahu.ahu} result={result} />
+          <EquationTrace ahu={ahu.ahu} result={result} unitSystem={ahu.unitSystem} />
         </div>
       </main>
 
@@ -116,9 +118,7 @@ export function App(): JSX.Element {
         </p>
       </footer>
 
-      {ezHelpOpen && (
-        <EzHelpDialog rows={EZ_CONFIGS} onClose={() => setEzHelpOpen(false)} />
-      )}
+      {ezHelpOpen && <EzHelpDialog rows={EZ_CONFIGS} onClose={() => setEzHelpOpen(false)} />}
     </div>
   );
 }

@@ -13,16 +13,18 @@
  * definition, no per-zone breakdown makes sense.
  */
 import { useMemo, useState } from 'react';
-import type {
-  AhuInput,
-  MultiZoneResult,
-  SingleZoneResult,
-  ZoneResult,
-} from '../lib/ashrae621';
+import type { AhuInput, MultiZoneResult, SingleZoneResult, ZoneResult } from '../lib/ashrae621';
+import type { Units } from '../lib/units';
 
 export interface EffZoneChartProps {
   ahu: AhuInput;
   result: MultiZoneResult | SingleZoneResult;
+  /**
+   * Active unit system for display. Accepted for consistency with the other
+   * analysis components but currently unused — the chart only renders
+   * dimensionless ratios (Evz, Zd), which are unit-invariant.
+   */
+  unitSystem?: Units;
 }
 
 interface Bar {
@@ -33,7 +35,14 @@ interface Bar {
   isLow: boolean; // Evz < 0.9 (warning)
 }
 
-export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | null {
+export function EffZoneChart({
+  ahu,
+  result,
+  // Plumbed for P0.3 — chart only renders unitless ratios (Evz, Zd) so
+  // no display conversion is required. Keeping the prop in the interface
+  // so a future Voz/area overlay can be unit-aware without churning callers.
+  unitSystem: _unitSystem,
+}: EffZoneChartProps): JSX.Element | null {
   const [open, setOpen] = useState(true);
 
   const isMultiResult = 'rows' in result && 'vou' in result;
@@ -46,9 +55,7 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
     if (rows.length === 0) return [];
     if (isSimplified) {
       // Simplified: sort by Zd descending. Driving zone is max.
-      const sorted = [...rows].sort(
-        (a: ZoneResult, b: ZoneResult) => b.zd - a.zd,
-      );
+      const sorted = [...rows].sort((a: ZoneResult, b: ZoneResult) => b.zd - a.zd);
       return sorted.map((r) => ({
         tag: r.z.tag ?? '—',
         pct: Math.max(2, Math.min(100, (r.zd / 0.6) * 100)),
@@ -58,9 +65,7 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
       }));
     }
     // Appendix A: sort by Evz ascending. Critical is the minimum.
-    const sorted = [...rows].sort(
-      (a: ZoneResult, b: ZoneResult) => a.evz - b.evz,
-    );
+    const sorted = [...rows].sort((a: ZoneResult, b: ZoneResult) => a.evz - b.evz);
     return sorted.map((r) => ({
       tag: r.z.tag ?? '—',
       pct: Math.max(2, Math.min(100, ((r.evz - 0.5) / 0.55) * 100)),
@@ -73,9 +78,7 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
   // Only meaningful for multizone — singlezone has no per-zone breakdown.
   if (!m || m.rows.length === 0) return null;
 
-  const title = isSimplified
-    ? 'Zone primary OA fraction Zd'
-    : 'Zone ventilation efficiency Evz';
+  const title = isSimplified ? 'Zone primary OA fraction Zd' : 'Zone ventilation efficiency Evz';
   const subtitle = isSimplified
     ? 'Sorted high → low. The maximum drives Table 6-3 / Eq. 6-7–6-8.'
     : 'Sorted low → high. The lowest (critical) zone sets system Ev.';
@@ -106,9 +109,7 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
           <div className="eff-chart" role="list">
             {bars.map((b) => (
               <div className="eff-chart__row" role="listitem" key={b.tag}>
-                <span
-                  className={`eff-chart__tag${b.isCritical ? ' eff-chart__tag--crit' : ''}`}
-                >
+                <span className={`eff-chart__tag${b.isCritical ? ' eff-chart__tag--crit' : ''}`}>
                   {b.tag}
                 </span>
                 <div className="eff-chart__track">
@@ -119,9 +120,7 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
                     data-bar-tag={b.tag}
                   />
                 </div>
-                <span
-                  className={`eff-chart__val${b.isCritical ? ' eff-chart__val--crit' : ''}`}
-                >
+                <span className={`eff-chart__val${b.isCritical ? ' eff-chart__val--crit' : ''}`}>
                   {b.val}
                 </span>
               </div>
@@ -133,14 +132,16 @@ export function EffZoneChart({ ahu, result }: EffZoneChartProps): JSX.Element | 
           </div>
           <p className="eff-chart__legend">
             {isSimplified ? (
-              <>Driving zone is <b>highlighted</b>.</>
+              <>
+                Driving zone is <b>highlighted</b>.
+              </>
             ) : (
               <>
-                Critical zone is <b>highlighted</b>. Bars below <b>0.90</b> show
-                a warning tint (low ventilation efficiency).
+                Critical zone is <b>highlighted</b>. Bars below <b>0.90</b> show a warning tint (low
+                ventilation efficiency).
               </>
-            )}
-            {' '}Air handler: <b>{ahu.name ?? '—'}</b>.
+            )}{' '}
+            Air handler: <b>{ahu.name ?? '—'}</b>.
           </p>
         </>
       )}
