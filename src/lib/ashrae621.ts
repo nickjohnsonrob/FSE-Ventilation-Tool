@@ -36,6 +36,14 @@ import {
 import type { SimplifiedMethod } from './tables';
 export type { SimplifiedMethod };
 
+/**
+ * System ventilation type per ASHRAE 62.1 §6.2.5 / §6.2.6.
+ * - `DR`   — Dilution (recirculating), §6.2.5.1 Simplified path
+ * - `DC`   — Distribution-controlled (Appendix A full)
+ * - `DC+`  — DC with enhanced fan power allowance (informational)
+ */
+export type SystemType = 'DR' | 'DC' | 'DC+';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -128,14 +136,15 @@ export interface AhuInput {
   roomsEnabled?: boolean;
   /**
    * System ventilation type per ASHRAE 62.1 §6.2.5 / §6.2.6.
-   * - `DR`   — Dilution (recirculating), §6.2.5.1 Simplified path
-   * - `DC`   — Distribution-controlled (Appendix A full)
-   * - `DC+`  — DC with enhanced fan power allowance (informational)
+   * Drives the EquationTrace rendering. Math (Vbz/Voz/Vou/Vot) is
+   * byte-identical across all three — the choice only changes which
+   * downstream steps the trace surfaces.
    *
-   * Optional. Default `undefined` is treated as `DR` at runtime by the math core.
-   * Types-only addition — no behavior change yet. UI + math follow in subsequent PRs.
+   * Optional in the type so existing fixtures and deserialization paths
+   * stay valid. `useAhuState` defaults it to `'DR'` for newly created
+   * AHUs. `compute()` and the UI both treat `undefined` as `'DR'`.
    */
-  systemType?: 'DR' | 'DC' | 'DC+';
+  systemType?: SystemType;
 }
 
 /** Per-zone calculation result (multi-zone mode). */
