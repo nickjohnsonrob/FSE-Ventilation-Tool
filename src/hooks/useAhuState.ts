@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { AhuInput, RoomInput, ZoneInput } from '../lib/ashrae621';
+import type { AhuInput, RoomInput, SystemType, ZoneInput } from '../lib/ashrae621';
 import type { Units } from '../lib/units';
 
 /** localStorage key for the unit-system preference. Versioned (`v1`)
@@ -109,7 +109,7 @@ function makeRoomSeed(zoneTag: string, idx: number, area = 250, pop = 2): RoomIn
   };
 }
 
-/** First/seed AHU — matches v1.0.0 constructor. */
+/** First/seed AHU — matches v1.0.0 constructor (with DR system type default). */
 function makeSeedAhu(): AhuInput {
   return {
     id: 'a1',
@@ -123,6 +123,7 @@ function makeSeedAhu(): AhuInput {
     vpsAuto: false,
     vps: 0,
     zones: makeMultiZoneSeed(),
+    systemType: 'DR',
   };
 }
 
@@ -176,6 +177,13 @@ export interface AhuStateApi {
   setActive: (id: string) => void;
   /** Rename any AHU by id (no-op if id is unknown). Does not change activeId. */
   renameAhu: (id: string, name: string) => void;
+  /**
+   * Set the system ventilation type on any AHU by id
+   * (`DR` / `DC` / `DC+`). No-op if id is unknown. Does not change
+   * activeId. The math core does not read this field — it only drives
+   * the EquationTrace rendering on the selected AHU.
+   */
+  setSystemType: (id: string, systemType: SystemType) => void;
 }
 
 export function useAhuState(): AhuStateApi {
@@ -349,6 +357,7 @@ export function useAhuState(): AhuStateApi {
         vpsAuto: false,
         vps: 0,
         zones: defaultZoneFor(type),
+        systemType: 'DR',
       };
       return [...prev, next];
     });
@@ -382,6 +391,13 @@ export function useAhuState(): AhuStateApi {
     });
   }, []);
 
+  const setSystemType = useCallback((id: string, systemType: SystemType) => {
+    setAhus((prev) => {
+      if (!prev.some((a) => a.id === id)) return prev;
+      return prev.map((a) => (a.id === id ? { ...a, systemType } : a));
+    });
+  }, []);
+
   const setUnitSystem = useCallback((u: Units) => {
     setUnitSystemState(u);
     writeUnitsToStorage(u);
@@ -406,6 +422,7 @@ export function useAhuState(): AhuStateApi {
     removeUnit,
     setActive,
     renameAhu,
+    setSystemType,
   };
 }
 
