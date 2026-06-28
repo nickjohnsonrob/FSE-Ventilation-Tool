@@ -13,10 +13,17 @@
  *
  * The preset does NOT mutate room math semantics; it only seeds the zone
  * shape (space / area / pop / ezConfig). Room totals are rebalanced to match.
+ *
+ * Favorites:
+ *   - Each row has a star button (★/☆) that toggles a per-user favorite.
+ *   - Favorites appear in a "Favorites" group at the top of the menu.
+ *   - Favorites survive AHU switches and state reloads (separate
+ *     localStorage key, per-user, all-AHUs shared — locked scope).
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ZoneInput } from '../lib/ashrae621';
 import { groupPresets, searchPresets, type Preset, type PresetGroup } from '../lib/presets';
+import { addFavorite, hasFavorite, loadFavorites, removeFavorite } from '../lib/storage/favorites';
 
 export interface PresetMenuProps {
   zones: ZoneInput[];
@@ -31,6 +38,10 @@ export function PresetMenu({ zones, focusedZoneId, onApply }: PresetMenuProps): 
   const [query, setQuery] = useState('');
   const [targetZoneId, setTargetZoneId] = useState<string | null>(focusedZoneId ?? null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  // Bump this counter to force a re-read of favorites from localStorage.
+  // localStorage isn't reactive in React, so a manual nudge keeps the star
+  // icon and the Favorites group in sync after add/remove.
+  const [favVersion, setFavVersion] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const titleId = useId();
@@ -73,13 +84,6 @@ export function PresetMenu({ zones, focusedZoneId, onApply }: PresetMenuProps): 
     return undefined;
   }, [open]);
 
-  const groups: PresetGroup[] = useMemo(() => {
-    if (!query.trim()) return groupPresets();
-    // When searching, return a single virtual group of all matches so the
-    // user sees results without having to expand each category.
-    return [{ category: `Results (${searchPresets(query).length})`, rows: searchPresets(query) }];
-  }, [query]);
-
   const toggleCategory = (cat: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -96,8 +100,61 @@ export function PresetMenu({ zones, focusedZoneId, onApply }: PresetMenuProps): 
     setQuery('');
   };
 
+  // Toggle a preset's favorite status. The star button stops event
+  // propagation so this never fires the row's "apply preset" handler.
+  const toggleFavorite = (id: string) => {
+    if (hasFavorite(id)) removeFavorite(id);
+    else addFavorite(id);
+    setFavVersion((v) => v + 1);
+  };
+
+  // Build the rendered groups. Three regimes:
+  //   1. Searching → single virtual group of all matches (no Favorites split).
+  //   2. No search, no favorites → canonical groupPresets() output.
+  //   3. No search, some favorites → "Favorites" group at the top, then the
+  //      canonical groups with favorited rows pulled out (no dupes).
+  const groups: PresetGroup[] = useMemo(() => {
+    // Touch favVersion so this memo re-runs when stars toggle.
+    void favVersion;
+    if (query.trim()) {
+      return [
+        {
+          category: `Results (${searchPresets(query).length})`,
+          rows: searchPresets(query),
+        },
+      ];
+    }
+    const favIds = loadFavorites();
+    const all = groupPresets();
+    if (favIds.size === 0) return all;
+    // Flatten all presets to resolve favorited ids into full Preset rows
+    // so we can render name + meta.
+    const byId = new Map<string, Preset>();
+    for (const g of all) for (const p of g.rows) byId.set(p.id, p);
+    const favRows: Preset[] = [];
+    for (const id of favIds) {
+      const p = byId.get(id);
+      if (p) favRows.push(p);
+    }
+    // Drop favorited rows from their canonical groups so they don't appear
+    // twice in the menu. Preserve order in the Favorites group to match the
+    // order the engineer starred them.
+    const filtered = all.map((g) => ({
+      ...g,
+      rows: g.rows.filter((p) => !favIds.has(p.id)),
+    }));
+    return [{ category: 'Favorites', rows: favRows }, ...filtered];
+  }, [favVersion, query]);
+
   // Resolve the current target zone label for the picker hint.
   const targetZone = zones.find((z) => z.id === targetZoneId) ?? null;
+
+  // Read favorites once per render so star icons reflect current state.
+  // (Cheap: localStorage read + a Set lookup per row.)
+  const favIds = useMemo(() => {
+    void favVersion;
+    return loadFavorites();
+  }, [favVersion]);
 
   return (
     <div className="preset-menu" ref={rootRef}>
@@ -177,8 +234,16 @@ export function PresetMenu({ zones, focusedZoneId, onApply }: PresetMenuProps): 
             )}
             {groups.map((g) => {
               const isCollapsed = collapsed.has(g.category);
+              const isFavGroup = g.category === 'Favorites';
               return (
-                <section key={g.category} className="preset-group" data-testid="preset-group">
+                <section
+                  key={g.category}
+                  className={
+                    isFavGroup ? 'preset-group preset-group--favorites' : 'preset-group'
+                  }
+                  data-testid="preset-group"
+                  data-fav-group={isFavGroup ? '1' : undefined}
+                >
                   <button
                     type="button"
                     className="preset-group__header"
@@ -191,28 +256,51 @@ export function PresetMenu({ zones, focusedZoneId, onApply }: PresetMenuProps): 
                   </button>
                   {!isCollapsed && (
                     <ul className="preset-group__rows">
-                      {g.rows.map((p) => (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            className="preset-row"
-                            onClick={() => handleApply(p)}
-                            data-testid="preset-row"
-                            data-preset-id={p.id}
-                            disabled={!targetZoneId && zones.length > 1}
-                            title={
-                              !targetZoneId && zones.length > 1
-                                ? 'Pick a target zone first'
-                                : `Load ${p.spaceType} (${p.defaultArea} ft², ${p.defaultPop} ppl)`
-                            }
-                          >
-                            <span className="preset-row__name">{p.spaceType}</span>
-                            <span className="preset-row__meta">
-                              {p.defaultArea} ft² · {p.defaultPop} ppl · Rp={p.rp}, Ra={p.ra}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
+                      {g.rows.map((p) => {
+                        const isFav = favIds.has(p.id);
+                        return (
+                          <li key={p.id}>
+                            <div className="preset-row">
+                              <button
+                                type="button"
+                                className="preset-row__main"
+                                onClick={() => handleApply(p)}
+                                data-testid="preset-row"
+                                data-preset-id={p.id}
+                                disabled={!targetZoneId && zones.length > 1}
+                                title={
+                                  !targetZoneId && zones.length > 1
+                                    ? 'Pick a target zone first'
+                                    : `Load ${p.spaceType} (${p.defaultArea} ft², ${p.defaultPop} ppl)`
+                                }
+                              >
+                                <span className="preset-row__name">{p.spaceType}</span>
+                                <span className="preset-row__meta">
+                                  {p.defaultArea} ft² · {p.defaultPop} ppl · Rp={p.rp}, Ra={p.ra}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  isFav ? 'preset-row__star preset-row__star--on' : 'preset-row__star'
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(p.id);
+                                }}
+                                data-testid="preset-star"
+                                data-preset-star-id={p.id}
+                                data-fav={isFav ? '1' : '0'}
+                                aria-label={isFav ? `Unfavorite ${p.spaceType}` : `Favorite ${p.spaceType}`}
+                                aria-pressed={isFav}
+                                title={isFav ? 'Remove from Favorites' : 'Add to Favorites'}
+                              >
+                                {isFav ? '\u2605' : '\u2606'}
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </section>
