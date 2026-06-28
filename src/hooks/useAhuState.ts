@@ -294,9 +294,38 @@ export function useAhuState(): AhuStateApi {
             zones: a.zones.map((z) => {
               if (z.id !== zid) return z;
               const rooms = z.rooms ?? [];
+              const nextRooms = rooms.map((r) =>
+                r.id === rid ? { ...r, ...partial } : r,
+              );
+              // Sync z.area / z.pop to the new Σ(rooms) when the user
+              // edits a room directly. The math core already uses
+              // Σ(rooms) when rooms exist, but the displayed (locked)
+              // zone-area input shows z.area — keeping it in sync prevents
+              // the "rollup shows zero / re-expand re-zeros the rooms"
+              // bug. Only sync the fields the caller actually touched;
+              // other fields (tag, space, vpz, ezConfig) don't affect
+              // the rollup.
+              const touchedArea = Object.prototype.hasOwnProperty.call(
+                partial,
+                'area',
+              );
+              const touchedPop = Object.prototype.hasOwnProperty.call(
+                partial,
+                'pop',
+              );
+              const sumArea = nextRooms.reduce(
+                (acc, r) => acc + (Number.isFinite(r.area) ? r.area : 0),
+                0,
+              );
+              const sumPop = nextRooms.reduce(
+                (acc, r) => acc + (Number.isFinite(r.pop) ? r.pop : 0),
+                0,
+              );
               return {
                 ...z,
-                rooms: rooms.map((r) => (r.id === rid ? { ...r, ...partial } : r)),
+                rooms: nextRooms,
+                area: touchedArea ? +sumArea.toFixed(1) : z.area,
+                pop: touchedPop ? +sumPop.toFixed(1) : z.pop,
               };
             }),
           };

@@ -230,6 +230,58 @@ describe('useAhuState', () => {
     expect(result.current.ahu.zones.map((z) => z.id)).toEqual([z2.id, z1.id]);
   });
 
+  it('patchRoom(area) syncs z.area to Σ(rooms).area so the displayed rollup matches', () => {
+    // Regression: the rollup used to show the original z.area (often 0
+    // for new zones) while the rooms themselves carried real area
+    // values. That made the zone-row input display 0 even after the
+    // user typed 100 into each of 5 rooms — and re-expanding the zone
+    // would overwrite the typed values back to 0/5. The fix syncs
+    // z.area / z.pop to the sum of room values on every patch.
+    const { result } = renderHook(() => useAhuState());
+    const zoneId = result.current.ahu.zones[0].id;
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    expect(result.current.ahu.zones[0].rooms).toHaveLength(5);
+
+    // Type 100 into each room's area field (simulates five consecutive
+    // .fill('100') calls).
+    for (const r of result.current.ahu.zones[0].rooms!) {
+      act(() => result.current.patchRoom(zoneId, r.id, { area: 100 }));
+    }
+
+    const z = result.current.ahu.zones[0];
+    expect(z.area).toBe(500); // 5 × 100
+    expect(z.rooms!.map((r) => r.area)).toEqual([100, 100, 100, 100, 100]);
+  });
+
+  it('patchRoom(pop) syncs z.pop to Σ(rooms).pop', () => {
+    const { result } = renderHook(() => useAhuState());
+    const zoneId = result.current.ahu.zones[0].id;
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    act(() => result.current.addRoom(zoneId));
+    for (const r of result.current.ahu.zones[0].rooms!) {
+      act(() => result.current.patchRoom(zoneId, r.id, { pop: 2 }));
+    }
+    expect(result.current.ahu.zones[0].pop).toBe(6); // 3 × 2
+  });
+
+  it('patchRoom without area/pop keys does NOT touch z.area / z.pop', () => {
+    // Guard against accidentally clobbering the zone totals when the
+    // caller only edited, say, the room tag or vpz.
+    const { result } = renderHook(() => useAhuState());
+    const zoneId = result.current.ahu.zones[0].id;
+    act(() => result.current.patchZone(zoneId, { area: 800, pop: 8 }));
+    act(() => result.current.addRoom(zoneId));
+    const rid = result.current.ahu.zones[0].rooms![0].id;
+    act(() => result.current.patchRoom(zoneId, rid, { tag: 'Conf-A', vpz: 200 }));
+    expect(result.current.ahu.zones[0].area).toBe(800);
+    expect(result.current.ahu.zones[0].pop).toBe(8);
+  });
+
   it('reorderZones appends zones omitted from newOrder at the end', () => {
     const { result } = renderHook(() => useAhuState());
     const z1 = result.current.ahu.zones[0];
