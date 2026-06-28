@@ -176,6 +176,17 @@ export interface AhuStateApi {
   setActive: (id: string) => void;
   /** Rename any AHU by id (no-op if id is unknown). Does not change activeId. */
   renameAhu: (id: string, name: string) => void;
+  /**
+   * Reorder zones within the active AHU. `newOrder` is an array of zone
+   * ids in the desired order. Any zone ids not present in the array keep
+   * their relative position at the end; ids that don't exist in the AHU
+   * are ignored. No-op when called with an unknown active AHU id.
+   *
+   * Zone objects are preserved by reference (tags, area, pop, rooms, …)
+   * — only display order changes. `compute()` results are invariant
+   * because the math core doesn't depend on iteration order.
+   */
+  reorderZones: (newOrder: string[]) => void;
 }
 
 export function useAhuState(): AhuStateApi {
@@ -387,6 +398,35 @@ export function useAhuState(): AhuStateApi {
     writeUnitsToStorage(u);
   }, []);
 
+  const reorderZones = useCallback(
+    (newOrder: string[]) => {
+      setAhus((prev) =>
+        prev.map((a) => {
+          if (a.id !== activeId) return a;
+          const byId = new Map(a.zones.map((z) => [z.id, z] as const));
+          // Resolve the requested order against the existing zones. Unknown
+          // ids are silently dropped; zones not present in `newOrder` keep
+          // their relative position at the end (preserves the "drop into
+          // empty list" case without data loss).
+          const resolved: ZoneInput[] = [];
+          const seen = new Set<string>();
+          for (const id of newOrder) {
+            const z = byId.get(id);
+            if (z && !seen.has(id)) {
+              resolved.push(z);
+              seen.add(id);
+            }
+          }
+          for (const z of a.zones) {
+            if (!seen.has(z.id)) resolved.push(z);
+          }
+          return { ...a, zones: resolved };
+        }),
+      );
+    },
+    [activeId],
+  );
+
   return {
     ahus,
     activeId,
@@ -406,6 +446,7 @@ export function useAhuState(): AhuStateApi {
     removeUnit,
     setActive,
     renameAhu,
+    reorderZones,
   };
 }
 

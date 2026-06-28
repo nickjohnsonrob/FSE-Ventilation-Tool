@@ -8,7 +8,7 @@
  * to make sure React state updates actually fire (not just a pure function).
  */
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { useAhuState } from '../useAhuState';
 
 describe('useAhuState', () => {
@@ -171,6 +171,72 @@ describe('useAhuState', () => {
     act(() => result.current.renameAhu(result.current.ahus[0].id!, 'RTU-WEST'));
     expect(result.current.activeId).toBe(activeBefore);
     expect(result.current.ahu.name).toBe('RTU-WEST');
+  });
+
+  it('reorderZones reshuffles zones by id within the active AHU', () => {
+    const { result } = renderHook(() => useAhuState());
+    // Seed: [TU-1-01, TU-1-02]. Capture the original zone ids.
+    const z1 = result.current.ahu.zones[0];
+    const z2 = result.current.ahu.zones[1];
+    expect(z1.tag).toBe('TU-1-01');
+    expect(z2.tag).toBe('TU-1-02');
+
+    // Reorder to [z2, z1]
+    act(() => result.current.reorderZones([z2.id, z1.id]));
+    expect(result.current.ahu.zones.map((z) => z.id)).toEqual([z2.id, z1.id]);
+    // Tags follow their zones (preserved object identity, not re-tagged)
+    expect(result.current.ahu.zones[0].tag).toBe('TU-1-02');
+    expect(result.current.ahu.zones[1].tag).toBe('TU-1-01');
+  });
+
+  it('reorderZones preserves every zone field — only display order changes', () => {
+    const { result } = renderHook(() => useAhuState());
+    // Set distinct values on each zone so we can prove nothing mutates
+    act(() =>
+      result.current.patchZone(result.current.ahu.zones[0].id, {
+        area: 1000,
+        pop: 10,
+        vpz: 150,
+      }),
+    );
+    act(() =>
+      result.current.patchZone(result.current.ahu.zones[1].id, {
+        area: 500,
+        pop: 5,
+        vpz: 200,
+      }),
+    );
+    const z1 = result.current.ahu.zones[0];
+    const z2 = result.current.ahu.zones[1];
+
+    // Swap them
+    act(() => result.current.reorderZones([z2.id, z1.id]));
+
+    // Same zone objects, same data — just in the new order
+    expect(result.current.ahu.zones[0].area).toBe(500);
+    expect(result.current.ahu.zones[0].pop).toBe(5);
+    expect(result.current.ahu.zones[0].vpz).toBe(200);
+    expect(result.current.ahu.zones[1].area).toBe(1000);
+    expect(result.current.ahu.zones[1].pop).toBe(10);
+    expect(result.current.ahu.zones[1].vpz).toBe(150);
+  });
+
+  it('reorderZones silently drops unknown zone ids', () => {
+    const { result } = renderHook(() => useAhuState());
+    const z1 = result.current.ahu.zones[0];
+    const z2 = result.current.ahu.zones[1];
+    // First slot is garbage; second slot is real. Result should be [z2, z1].
+    act(() => result.current.reorderZones(['z-not-real', z2.id, z1.id]));
+    expect(result.current.ahu.zones.map((z) => z.id)).toEqual([z2.id, z1.id]);
+  });
+
+  it('reorderZones appends zones omitted from newOrder at the end', () => {
+    const { result } = renderHook(() => useAhuState());
+    const z1 = result.current.ahu.zones[0];
+    const z2 = result.current.ahu.zones[1];
+    // Pass only z2; z1 should still appear at the end (preserved).
+    act(() => result.current.reorderZones([z2.id]));
+    expect(result.current.ahu.zones.map((z) => z.id)).toEqual([z2.id, z1.id]);
   });
 });
 

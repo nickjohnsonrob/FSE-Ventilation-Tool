@@ -978,6 +978,67 @@ button {
   color: var(--ac2);
 }
 
+/* ---- v3.x drag-to-reorder column (P1) ----
+   A narrow left column with a drag handle on each zone row. Hidden by
+   default, fades in on row hover (or while the row is being dragged /
+   the handle is keyboard-focused). Keeps the default UI uncluttered
+   while staying discoverable — the spec for this feature. */
+
+.zone-table__main th.col-drag,
+.zone-table__main td.col-drag {
+  width: 22px;
+  padding: 0;
+  text-align: center;
+}
+
+.zone-row__drag {
+  width: 18px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--mut);
+  cursor: grab;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  touch-action: none; /* let dnd-kit handle touch gestures */
+  letter-spacing: -2px;
+}
+
+.zone-row__drag:active {
+  cursor: grabbing;
+}
+
+.zone-row:hover .zone-row__drag,
+.zone-row__drag:focus-visible,
+.zone-row.row--dragging .zone-row__drag {
+  opacity: 0.85;
+}
+
+.zone-row__drag:hover {
+  background: var(--inset);
+  color: var(--ink);
+  opacity: 1;
+}
+
+/* Row's own focus + drag visual feedback */
+.zone-row.row--dragging {
+  outline: 1px dashed var(--ac2);
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zone-row__drag {
+    transition: opacity 60ms ease;
+  }
+}
+
 .zone-row__dot {
   width: 8px;
   height: 8px;
