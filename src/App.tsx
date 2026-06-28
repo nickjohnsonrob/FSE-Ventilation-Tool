@@ -9,9 +9,12 @@ import { ExportButton } from './components/ExportButton';
 import { AhuPicker } from './components/AhuPicker';
 import { EffZoneChart } from './components/EffZoneChart';
 import { EquationTrace } from './components/EquationTrace';
+import { SaveButton } from './components/SaveButton';
+import { LibraryModal } from './components/LibraryModal';
 import { useAhuState } from './hooks/useAhuState';
 import { compute } from './lib/ashrae621';
 import { EZ_CONFIGS } from './lib/tables';
+import type { SerializedState, Snapshot } from './lib/storage/snapshots';
 
 /**
  * Top-level app shell.
@@ -29,8 +32,26 @@ export function App(): JSX.Element {
   });
   const [ezHelpOpen, setEzHelpOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const ahu = useAhuState();
   const result = useMemo(() => compute(ahu.ahu), [ahu.ahu]);
+
+  /**
+   * Build the SerializedState snapshot of the current app state. Pulled
+   * out so SaveButton can read fresh values at click time (rather than
+   * capturing stale state from a stale closure).
+   */
+  const getSerializedState = (): SerializedState => ({
+    schemaVersion: 1,
+    ahus: ahu.ahus,
+    activeId: ahu.activeId,
+    unitSystem: ahu.unitSystem,
+  });
+
+  const handleLoadSnapshot = (snap: Snapshot): void => {
+    ahu.restoreState(snap.state);
+    setLibraryOpen(false);
+  };
 
   // The DS bundle's dark theme is bound to `:root[data-theme="dark"]`,
   // which targets the <html> element. Sync the attribute whenever
@@ -53,6 +74,16 @@ export function App(): JSX.Element {
         unitSystem={ahu.unitSystem}
         onToggleUnits={() => ahu.setUnitSystem(ahu.unitSystem === 'ip' ? 'si' : 'ip')}
       >
+        <SaveButton getState={getSerializedState} />
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setLibraryOpen(true)}
+          data-testid="library-button"
+          title="Open the snapshot library"
+        >
+          Library
+        </button>
         <ExportButton ahus={ahu.ahus} activeId={ahu.activeId} />
         <ThemeToggle dark={dark} onToggle={() => setDark(!dark)} />
       </Header>
@@ -120,6 +151,10 @@ export function App(): JSX.Element {
       </footer>
 
       {ezHelpOpen && <EzHelpDialog rows={EZ_CONFIGS} onClose={() => setEzHelpOpen(false)} />}
+
+      {libraryOpen && (
+        <LibraryModal onLoad={handleLoadSnapshot} onClose={() => setLibraryOpen(false)} />
+      )}
     </div>
   );
 }

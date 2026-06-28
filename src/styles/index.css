@@ -1708,3 +1708,145 @@ button {
   color: var(--mut);
   user-select: none;
 }
+
+/* =====================================================================
+ * SAVE BUTTON — inline name input for snapshot library
+ * ===================================================================== */
+
+.save-button__naming {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.save-button__input {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--ac);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--ink);
+  outline: none;
+  width: 180px;
+  box-shadow: 0 0 0 2px var(--acq);
+}
+
+.save-button__input::placeholder {
+  color: var(--mut);
+}
+
+/* =====================================================================
+ * LIBRARY MODAL — snapshot browser (load / rename / delete)
+ * ===================================================================== */
+
+.library-modal {
+  max-width: 760px;
+}
+
+.library-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+}
+
+.library-modal__head h3 {
+  margin: 0;
+}
+
+.library-modal__close {
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.library-modal__close:hover {
+  color: var(--sec);
+}
+
+.library-modal__empty {
+  padding: var(--sp-5);
+  text-align: center;
+  background: var(--sunken);
+  border-radius: var(--radius);
+  border: 1px dashed var(--line2);
+}
+
+.library-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+
+.library-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px 12px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.library-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-row__name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-row__rename-input {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border: 1px solid var(--ac);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink);
+  outline: none;
+  width: 100%;
+  box-shadow: 0 0 0 2px var(--acq);
+}
+
+.library-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.library-row__date {
+  font-family: var(--mono);
+  color: var(--mut);
+}
+
+.library-row__summary {
+  font-family: var(--mono);
+  color: var(--sec);
+}
+
+.library-row__actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}

@@ -1,6 +1,10 @@
 import { useCallback, useState } from 'react';
 import type { AhuInput, RoomInput, ZoneInput } from '../lib/ashrae621';
 import type { Units } from '../lib/units';
+import {
+  SNAPSHOT_SCHEMA_VERSION,
+  type SerializedState,
+} from '../lib/storage/snapshots';
 
 /** localStorage key for the unit-system preference. Versioned (`v1`)
  *  so future schema changes can migrate without colliding with stale
@@ -187,6 +191,16 @@ export interface AhuStateApi {
    * because the math core doesn't depend on iteration order.
    */
   reorderZones: (newOrder: string[]) => void;
+  /**
+   * Replace the entire state tree from a serialized snapshot.
+   *
+   * Validates the schema version before applying — mismatched versions
+   * are silently rejected (state tree is left untouched). Falls back to
+   * the first AHU if the snapshot's activeId doesn't match any AHU.
+   *
+   * Used by the snapshot library's Load action.
+   */
+  restoreState: (serialized: SerializedState) => void;
 }
 
 export function useAhuState(): AhuStateApi {
@@ -427,6 +441,26 @@ export function useAhuState(): AhuStateApi {
     [activeId],
   );
 
+  const restoreState = useCallback((serialized: SerializedState) => {
+    // Validate before mutating — never partially apply a bad snapshot.
+    if (!serialized || serialized.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
+      return;
+    }
+    if (!Array.isArray(serialized.ahus) || serialized.ahus.length === 0) {
+      return;
+    }
+    const ahus = serialized.ahus;
+    // If activeId doesn't match any AHU, fall back to the first so the
+    // hook invariant "active resolves" is preserved.
+    const activeId = ahus.some((a) => a?.id === serialized.activeId)
+      ? serialized.activeId
+      : (ahus[0].id as string);
+    const unitSystem: Units = serialized.unitSystem === 'si' ? 'si' : 'ip';
+    setAhus(ahus);
+    setActiveId(activeId);
+    setUnitSystemState(unitSystem);
+  }, []);
+
   return {
     ahus,
     activeId,
@@ -447,6 +481,7 @@ export function useAhuState(): AhuStateApi {
     setActive,
     renameAhu,
     reorderZones,
+    restoreState,
   };
 }
 
