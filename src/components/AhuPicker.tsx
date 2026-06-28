@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AhuInput, SystemType } from '../lib/ashrae621';
+import type { AhuInput } from '../lib/ashrae621';
 
 export interface AhuPickerProps {
   ahus: AhuInput[];
@@ -9,8 +9,6 @@ export interface AhuPickerProps {
   onRemove: (id: string) => void;
   /** Rename any AHU by id (no-op if id is unknown). Empty/whitespace reverts. */
   onRename: (id: string, name: string) => void;
-  /** Set system ventilation type (DR/DC/DC+) on any AHU by id. */
-  onSystemTypeChange: (id: string, systemType: SystemType) => void;
 }
 
 /**
@@ -33,7 +31,6 @@ export function AhuPicker({
   onAdd,
   onRemove,
   onRename,
-  onSystemTypeChange,
 }: AhuPickerProps): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -110,30 +107,6 @@ export function AhuPicker({
                 >
                   ×
                 </span>
-              )}
-              {isActive && (
-                <select
-                  className="ahu-tab__system-type-select"
-                  aria-label="System ventilation type"
-                  title="ASHRAE 62.1 system ventilation type"
-                  data-testid="system-type-select"
-                  // Stop propagation so the wrapping <button> doesn't fire
-                  // its onClick (which would either no-op on the active tab
-                  // or switch AHUs if we're on a future variant where the
-                  // select could appear on other tabs). Click + mousedown +
-                  // keyboard interaction all need to be contained.
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  value={a.systemType ?? 'DR'}
-                  onChange={(e) =>
-                    onSystemTypeChange(id, e.target.value as SystemType)
-                  }
-                >
-                  <option value="DR">Default (DR)</option>
-                  <option value="DC">Dual-Conduit (DC)</option>
-                  <option value="DC+">Dual-Conduit + (DC+)</option>
-                </select>
               )}
             </button>
           );

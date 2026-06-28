@@ -172,62 +172,6 @@ describe('useAhuState', () => {
     expect(result.current.activeId).toBe(activeBefore);
     expect(result.current.ahu.name).toBe('RTU-WEST');
   });
-
-  it('seed AHU defaults to systemType="DR"', () => {
-    const { result } = renderHook(() => useAhuState());
-    expect(result.current.ahus[0].systemType).toBe('DR');
-  });
-
-  it('addUnit creates AHUs that default to systemType="DR"', () => {
-    const { result } = renderHook(() => useAhuState());
-    let multizoneId = '';
-    let singlezoneId = '';
-    act(() => {
-      multizoneId = result.current.addUnit('multizone');
-      singlezoneId = result.current.addUnit('singlezone');
-    });
-    const mz = result.current.ahus.find((a) => a.id === multizoneId)!;
-    const sz = result.current.ahus.find((a) => a.id === singlezoneId)!;
-    expect(mz.systemType).toBe('DR');
-    expect(sz.systemType).toBe('DR');
-  });
-
-  it('setSystemType updates the AHU by id, any value', () => {
-    const { result } = renderHook(() => useAhuState());
-    const id = result.current.ahus[0].id!;
-    act(() => result.current.setSystemType(id, 'DC'));
-    expect(result.current.ahus[0].systemType).toBe('DC');
-    act(() => result.current.setSystemType(id, 'DC+'));
-    expect(result.current.ahus[0].systemType).toBe('DC+');
-    act(() => result.current.setSystemType(id, 'DR'));
-    expect(result.current.ahus[0].systemType).toBe('DR');
-  });
-
-  it('setSystemType can update a non-active AHU without changing activeId', () => {
-    const { result } = renderHook(() => useAhuState());
-    let secondId = '';
-    act(() => {
-      secondId = result.current.addUnit('multizone');
-    });
-    // Active is the new AHU
-    expect(result.current.activeId).toBe(secondId);
-    const activeBefore = result.current.activeId;
-    // Mutate the FIRST AHU
-    const firstId = result.current.ahus[0].id!;
-    act(() => result.current.setSystemType(firstId, 'DC+'));
-    const first = result.current.ahus.find((a) => a.id === firstId)!;
-    const second = result.current.ahus.find((a) => a.id === secondId)!;
-    expect(first.systemType).toBe('DC+');
-    expect(second.systemType).toBe('DR'); // unchanged
-    expect(result.current.activeId).toBe(activeBefore);
-  });
-
-  it('setSystemType is a no-op for an unknown id', () => {
-    const { result } = renderHook(() => useAhuState());
-    const before = result.current.ahu.systemType;
-    act(() => result.current.setSystemType('a-not-real', 'DC+'));
-    expect(result.current.ahus[0].systemType).toBe(before);
-  });
 });
 
 describe('useAhuState — unitSystem persistence', () => {

@@ -65,7 +65,6 @@ export function App(): JSX.Element {
           onAdd={ahu.addUnit}
           onRemove={ahu.removeUnit}
           onRename={ahu.renameAhu}
-          onSystemTypeChange={ahu.setSystemType}
         />
 
         <MethodSwitcher

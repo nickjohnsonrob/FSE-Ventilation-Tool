@@ -611,35 +611,6 @@ button {
   color: var(--sec);
 }
 
-.ahu-tab__system-type-select {
-  /* Small inline select that sits alongside the AHU name. Mirrors the
-   * name input's height and density so the tab strip stays compact.
-   * Stops bubbling at the React boundary (see AhuPicker.tsx) so a click
-   * doesn't re-fire the wrapping tab's onClick. */
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ac2);
-  background: var(--card);
-  border: 1px solid var(--ac200, var(--line2));
-  border-radius: 4px;
-  padding: 1px 4px 1px 5px;
-  margin-left: 2px;
-  cursor: pointer;
-  outline: none;
-  max-width: 130px;
-}
-
-.ahu-tab__system-type-select:hover {
-  border-color: var(--ac);
-}
-
-.ahu-tab__system-type-select:focus-visible {
-  border-color: var(--ac);
-  box-shadow: 0 0 0 2px var(--acq);
-}
-
 .ahu-picker__add {
   position: relative;
   flex: none;
